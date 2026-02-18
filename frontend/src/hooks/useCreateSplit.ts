@@ -203,7 +203,7 @@ export function useCreateSplit() {
       }
 
       // Final fallback: local ID
-      if (!splitId) {
+      if (!splitId || splitId === 'null' || splitId === 'undefined') {
         splitId = `local_${Date.now()}_${salt.slice(0, 10)}`;
         addLog('Split ID not yet available, using local ID (will sync later)', 'warning');
       }

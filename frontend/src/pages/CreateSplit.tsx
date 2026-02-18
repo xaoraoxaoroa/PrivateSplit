@@ -21,7 +21,7 @@ export function CreateSplit() {
     participants: string[];
   }) => {
     const split = await createSplit(data);
-    if (split) {
+    if (split && split.split_id && split.split_id !== 'null') {
       // Navigate to split detail after short delay
       setTimeout(() => navigate(`/split/${split.split_id}`), 1500);
     }

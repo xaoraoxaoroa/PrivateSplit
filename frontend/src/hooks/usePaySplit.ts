@@ -30,21 +30,18 @@ function getMicrocredits(record: any): number {
   }
 }
 
-/** Get the plaintext string for a credits record to pass as transaction input */
+/** Get the plaintext string for a record to pass as transaction input */
 function getRecordPlaintext(record: any): string | null {
-  // Prefer .plaintext directly
   if (record.plaintext) return record.plaintext;
 
-  // Reconstruct from parts
+  // Reconstruct from parts for credits records
   const nonce = record.nonce || record._nonce || record.data?._nonce;
   if (nonce && record.owner) {
     const microcredits = getMicrocredits(record);
     return `{ owner: ${record.owner}.private, microcredits: ${microcredits}u64.private, _nonce: ${nonce}.public }`;
   }
 
-  // Use ciphertext as last resort
   if (record.ciphertext) return record.ciphertext;
-
   return null;
 }
 
@@ -75,7 +72,7 @@ export function usePaySplit() {
       addLog('Verifying split on-chain...', 'system');
 
       let splitId = params.splitId;
-      if (!splitId) {
+      if (!splitId || splitId === 'null') {
         splitId = await getSplitIdFromMapping(params.salt) || undefined;
       }
 
@@ -92,24 +89,68 @@ export function usePaySplit() {
         addLog('Split ID not found in mapping, proceeding...', 'warning');
       }
 
-      // Step 3: Find suitable credits record
+      // Step 3: Find Debt record in wallet
       setStep('convert');
+      addLog('Searching for Debt record in wallet...', 'system');
+
+      let debtRecordInput: string | null = null;
+      let debtAmount = 0;
+
+      try {
+        const programRecords = (await requestRecords(PROGRAM_ID)) as any[];
+        addLog(`Found ${programRecords?.length || 0} program records`, 'info');
+
+        for (const r of programRecords || []) {
+          if (r.spent) continue;
+
+          const plaintext = r.plaintext || '';
+
+          // Match Debt record by salt or split_id
+          const matchesSalt = plaintext.includes(params.salt) || r.data?.salt === params.salt;
+          const matchesSplitId = splitId && (plaintext.includes(splitId) || r.data?.split_id === splitId);
+
+          if (matchesSalt || matchesSplitId) {
+            // Verify this is a Debt record (has creditor field, no participant_count)
+            const isDebt = (plaintext.includes('creditor') || r.data?.creditor) &&
+                          !(plaintext.includes('participant_count') || r.data?.participant_count);
+
+            if (isDebt) {
+              debtRecordInput = r.plaintext || r.ciphertext;
+              // Extract amount from the debt record
+              const amountMatch = plaintext.match(/amount:\s*(\d+)u64/);
+              if (amountMatch?.[1]) debtAmount = parseInt(amountMatch[1]);
+              addLog('Found matching Debt record', 'success');
+              break;
+            }
+          }
+        }
+      } catch (err: any) {
+        addLog(`Record fetch: ${err.message}`, 'warning');
+      }
+
+      if (!debtRecordInput) {
+        setError('No Debt record found in your wallet. The split creator must issue a debt to you first.');
+        addLog('Debt record not found — creator must issue debt first', 'error');
+        setStep('error');
+        return false;
+      }
+
+      // Step 4: Find suitable credits record
       addLog('Searching for private credit records...', 'system');
 
-      const amountMicro = parseInt(params.amount);
+      const amountMicro = debtAmount || parseInt(params.amount);
 
       let records: any[];
       try {
         records = (await requestRecords('credits.aleo')) as any[];
         addLog(`Found ${records?.length || 0} credit records`, 'info');
       } catch (err: any) {
-        addLog(`Record fetch failed: ${err.message}`, 'error');
+        addLog(`Credit record fetch failed: ${err.message}`, 'error');
         setError('Failed to fetch credit records from wallet');
         setStep('error');
         return false;
       }
 
-      // Find a record with sufficient balance
       let payRecord: any = null;
       for (const r of records || []) {
         if (r.spent) continue;
@@ -129,14 +170,14 @@ export function usePaySplit() {
 
         if (val > amountMicro) {
           payRecord = r;
-          addLog(`Found record with ${val} microcredits`, 'success');
+          addLog(`Found credits record with ${val} microcredits`, 'success');
           break;
         }
       }
 
       // Retry once after a short delay (records may be syncing)
       if (!payRecord) {
-        addLog('No suitable record found, retrying...', 'warning');
+        addLog('No suitable credits record found, retrying...', 'warning');
         await new Promise((r) => setTimeout(r, 2000));
         try {
           records = (await requestRecords('credits.aleo')) as any[];
@@ -145,7 +186,7 @@ export function usePaySplit() {
             const val = getMicrocredits(r);
             if (val > amountMicro) {
               payRecord = r;
-              addLog(`Found record with ${val} microcredits on retry`, 'success');
+              addLog(`Found credits record with ${val} microcredits on retry`, 'success');
               break;
             }
           }
@@ -153,36 +194,28 @@ export function usePaySplit() {
       }
 
       if (!payRecord) {
-        // Try public-to-private conversion
         addLog('No private record large enough. Try converting public credits first.', 'error');
         setError(`No private credit record with > ${amountMicro} microcredits. Convert public credits to private first.`);
         setStep('error');
         return false;
       }
 
-      // Get the record plaintext for the transaction input
-      const recordInput = getRecordPlaintext(payRecord);
-      if (!recordInput) {
-        setError('Could not extract record data. Try refreshing wallet.');
+      const creditsInput = getRecordPlaintext(payRecord);
+      if (!creditsInput) {
+        setError('Could not extract credits record data. Try refreshing wallet.');
         setStep('error');
         return false;
       }
 
-      // Step 4: Execute payment
+      // Step 5: Execute pay_debt(debt_record, credits_record)
       setStep('pay');
       addLog('Executing pay_debt transaction...', 'system');
 
-      // Construct proper inputs for pay_debt(debt_record, credits_record)
-      // The wallet adapter will prompt the user to select/approve the Debt record
-      // We pass the credits record we found as the second input
-      const inputs = [
-        recordInput,                        // credits record (plaintext)
-        params.creator,                     // creditor address (for debt verification)
-        `${amountMicro}u64`,               // amount
-        params.salt,                        // salt for split lookup
-      ];
+      // pay_debt takes exactly 2 inputs: Debt record + credits record
+      const inputs = [debtRecordInput, creditsInput];
 
-      addLog(`Inputs prepared: record=${recordInput.slice(0, 40)}...`, 'info');
+      addLog(`Debt record: ${debtRecordInput.slice(0, 40)}...`, 'info');
+      addLog(`Credits record: ${creditsInput.slice(0, 40)}...`, 'info');
 
       const transaction: TransactionOptions = {
         program: PROGRAM_ID,
@@ -199,13 +232,12 @@ export function usePaySplit() {
       setTxId(resultTxId || null);
       addLog(`Transaction submitted: ${resultTxId}`, 'success');
 
-      // Poll for confirmation using wallet adapter if available, else API
+      // Poll for confirmation
       if (resultTxId) {
         addLog('Waiting for on-chain confirmation...', 'system');
 
         let confirmed = false;
 
-        // Try wallet adapter's transactionStatus first (more reliable)
         if (wallet?.adapter?.transactionStatus) {
           let attempts = 0;
           while (!confirmed && attempts < 120) {

@@ -10,36 +10,54 @@ export function generateSalt(): string {
 }
 
 export async function getSplitIdFromMapping(salt: string): Promise<string | null> {
+  console.log(`Checking salt mapping for ${salt}...`);
   try {
     const url = `${TESTNET_API}/program/${PROGRAM_ID}/mapping/split_salts/${salt}`;
     const res = await fetch(url);
     if (!res.ok) return null;
-    const text = await res.text();
-    return text.replace(/"/g, '').trim() || null;
-  } catch {
-    return null;
+    const val = await res.json();
+    if (val) return val.toString().replace(/(['"])/g, '');
+  } catch (e) {
+    console.error('getSplitIdFromMapping error:', e);
   }
+  return null;
 }
 
 export async function getSplitStatus(splitId: string): Promise<{ participant_count: number; payment_count: number; status: number } | null> {
+  if (!splitId || splitId === 'null' || splitId === 'undefined') return null;
+  console.log(`Checking split status for ${splitId}...`);
   try {
     const url = `${TESTNET_API}/program/${PROGRAM_ID}/mapping/splits/${splitId}`;
     const res = await fetch(url);
     if (!res.ok) return null;
-    const text = await res.text();
-    // Parse SplitMeta struct: { participant_count: Xu8, payment_count: Xu8, status: Xu8 }
-    const pcMatch = text.match(/participant_count:\s*(\d+)u8/);
-    const pmMatch = text.match(/payment_count:\s*(\d+)u8/);
-    const stMatch = text.match(/status:\s*(\d+)u8/);
-    if (!pcMatch || !pmMatch || !stMatch) return null;
-    return {
-      participant_count: parseInt(pcMatch[1]),
-      payment_count: parseInt(pmMatch[1]),
-      status: parseInt(stMatch[1]),
-    };
-  } catch {
-    return null;
+    const data = await res.json();
+    if (!data) return null;
+
+    // Handle both string and object responses from the API
+    if (typeof data === 'string') {
+      const pcMatch = data.match(/participant_count:\s*(\d+)u8/);
+      const pmMatch = data.match(/payment_count:\s*(\d+)u8/);
+      const stMatch = data.match(/status:\s*(\d+)u8/);
+      if (!pcMatch || !pmMatch || !stMatch) return null;
+      return {
+        participant_count: parseInt(pcMatch[1]),
+        payment_count: parseInt(pmMatch[1]),
+        status: parseInt(stMatch[1]),
+      };
+    } else if (typeof data === 'object') {
+      const pc = data.participant_count;
+      const pm = data.payment_count;
+      const st = data.status;
+      return {
+        participant_count: typeof pc === 'string' ? parseInt(pc.replace(/u8/g, '').trim()) : (pc || 0),
+        payment_count: typeof pm === 'string' ? parseInt(pm.replace(/u8/g, '').trim()) : (pm || 0),
+        status: typeof st === 'string' ? parseInt(st.replace(/u8/g, '').trim()) : (st || 0),
+      };
+    }
+  } catch (e) {
+    console.error('getSplitStatus error:', e);
   }
+  return null;
 }
 
 export async function getTransactionStatus(txId: string): Promise<string | null> {
