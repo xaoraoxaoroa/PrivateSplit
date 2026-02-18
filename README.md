@@ -1,64 +1,210 @@
-# PrivateSplit - Privacy-First Expense Splitting on Aleo
+# PrivateSplit — The Only Private Expense Splitter on Aleo
 
-> Split expenses with friends without revealing who owes what.
+> Split expenses with friends without revealing who owes what, how much, or who paid.
 
-PrivateSplit is a privacy-preserving expense splitting protocol built on Aleo. Unlike Splitwise where the server sees every amount and participant, PrivateSplit keeps all financial details encrypted on-chain using zero-knowledge proofs.
-
-**Smart Contract:** private_split_v1.aleo on Aleo Testnet
-**Built for:** Aleo Privacy Buildathon by AKINDO - Wave 2
+**Live Demo:** https://privatesplit.vercel.app
+**Contract:** `private_split_v1.aleo` on Aleo Testnet
+**Built for:** Aleo Privacy Buildathon by AKINDO — Wave 2
+**GitHub:** https://github.com/xaoraoxaoroa/PrivateSplit
 
 ---
 
-## Why Privacy Matters for Expense Splitting
+## The Problem
 
-Traditional splitting apps create permanent readable records of how much you owe, who you spend time with, and your financial patterns. PrivateSplit eliminates this by keeping all amounts, participants, and settlement details encrypted in Aleo records. The only public information is anonymous metadata: a split exists, how many people are involved, and how many have paid - with zero amounts and zero addresses.
+Splitwise stores every expense, every amount, and every participant on their servers. Venmo publishes your payment activity by default. Every time you split a dinner or a trip with friends, a corporation learns your financial relationships, spending habits, and social graph.
+
+**PrivateSplit eliminates this.** Every amount, every participant, every debt — encrypted on-chain using zero-knowledge proofs. The only public information is an anonymous counter: "a split exists, N people were involved, M have paid."
+
+---
+
+## Why PrivateSplit Has Stronger Privacy Than Other Payment Apps on Aleo
+
+Most ZK payment systems still leak financial data because they use public inputs in transitions. Here is a concrete comparison:
+
+| Data | Splitwise | Venmo | Other ZK Apps | **PrivateSplit** |
+|------|-----------|-------|--------------|-----------------|
+| Payment amounts on-chain | N/A | N/A | **Public inputs** | **Never stored** |
+| Merchant/recipient address | N/A | N/A | **Public inputs** | **Encrypted in record** |
+| Who owes whom | Server | Server | N/A | **Zero on-chain trace** |
+| Debt issuance event | Server | Server | On-chain | **No finalize — invisible** |
+| Payment metadata | Server | Public | **Public field** | **Not supported (by design)** |
+| Settlement event | Server | N/A | Hash visible | Anonymous counter only |
+
+### The Nuclear Privacy Advantage: `issue_debt` Has No Finalize
+
+In PrivateSplit, when a creator issues a debt to a participant, **there is literally zero on-chain record that this happened**. The `issue_debt` transition has no `finalize` block. This means:
+
+- No mapping is written
+- No hash is stored
+- No event is emitted
+- The blockchain observer sees nothing
+
+The participant's encrypted Debt record appears in their wallet. That is it. No blockchain explorer can determine who owes what to whom.
+
+This is architecturally impossible with hash-based invoice systems that must register invoices on-chain.
 
 ---
 
 ## Privacy Model
 
-| Data | Where Stored | Visibility |
-|------|-------------|------------|
-| Creator identity | Split record (encrypted) | Private - only creator |
-| Total amount | Split record (encrypted) | Private - only creator |
-| Per-person share | Split + Debt records | Private - only involved parties |
-| Who owes whom | Debt record (encrypted) | Private - only debtor + creditor |
-| Payment amounts | Receipt records | Private - only payer + creditor |
-| Payment identity | credits.aleo/transfer_private | Private - hidden by protocol |
-| Split exists | splits mapping | Public (anonymous counter) |
-| Participant count | splits mapping | Public (just a number) |
-| Payment count | splits mapping | Public (just a number) |
-| Settlement status | splits mapping | Public (0=active 1=settled) |
+| Data | Storage | Visible To |
+|------|---------|-----------|
+| Total split amount | Split record (encrypted) | Creator only |
+| Per-person share | Split + Debt records | Creator + debtor only |
+| Who owes whom | Debt record (encrypted) | Debtor + creditor only |
+| Payment amounts | Receipt records (encrypted) | Payer + creditor only |
+| Payer identity | credits.aleo/transfer_private | Hidden by protocol |
+| Split exists | `splits` mapping | Public (anonymous) |
+| Number of participants | `splits` mapping | Public (just a count) |
+| Number of payments | `splits` mapping | Public (just a count) |
+| Settlement status | `splits` mapping | Public (0 or 1) |
 
-**Key principle:** Private data in records (encrypted). Public mappings = only anonymous counters.
+**Zero amounts in any public mapping. Zero addresses in any public mapping. Zero private data in any finalize block.**
 
 ---
 
-## Smart Contract - 5 Transitions
+## Smart Contract: 5 Transitions, 4 Records, Zero Leaks
 
-| # | Function | Async | Description |
-|---|----------|-------|-------------|
-| 1 | create_split(total, count, salt) | Yes | Creates Split record + metadata on-chain |
-| 2 | issue_debt(split_record, participant) | **No** | 100% private. No finalize. |
-| 3 | pay_debt(debt_record, credits_record) | Yes | Pays via credits.aleo/transfer_private |
-| 4 | settle_split(split_record) | Yes | Creator closes split |
-| 5 | verify_split(split_id) | Yes | Public status query |
+```
+program private_split_v1.aleo
+│
+├── Records (ALL private, encrypted to owner)
+│   ├── Split         — Creator's record (total, per-person, count)
+│   ├── Debt          — Participant's record (amount owed, to whom)
+│   ├── PayerReceipt  — Payer's proof of payment
+│   └── CreatorReceipt — Creator's proof of receipt
+│
+├── Mappings (ONLY anonymous counters, zero private data)
+│   ├── splits:      split_id → {participant_count, payment_count, status}
+│   └── split_salts: salt → split_id  (for post-creation lookup)
+│
+└── Transitions
+    ├── create_split(total, count, salt)         → Split + finalize (stores counters)
+    ├── issue_debt(split_record, participant)     → Split + Debt    (NO FINALIZE)
+    ├── pay_debt(debt_record, credits_record)     → receipts + finalize (increments counter)
+    ├── settle_split(split_record)               → finalize (sets status=1)
+    └── verify_split(split_id)                   → finalize (public read)
+```
 
-4 Record Types: Split, Debt, PayerReceipt, CreatorReceipt
-2 Mappings: splits (anonymous counters), split_salts (lookup)
+### Key Design: Only the Record Owner Can Spend It
 
-issue_debt has NO finalize - issuing debts reveals nothing on-chain.
+Aleo's protocol enforces record ownership at the ZK proof level — not application logic. This means:
+- Only the creator can issue debts (they own the Split record)
+- Only the participant can pay their debt (they own the Debt record)
+- Nobody can forge a receipt — ownership is cryptographically verified
 
 ---
 
 ## User Flow
 
-1. Creator connects Shield Wallet and creates a split (amount, participants)
-2. Creator issues debts to each participant (100% private)
-3. Participants receive Debt records, pay via payment link
-4. Payment uses credits.aleo/transfer_private (payer hidden)
-5. Both parties get encrypted receipt records
-6. Creator settles when all payments received
+```
+Creator                              Participant
+   │                                     │
+   ├─ create_split(amount, 3, salt)       │
+   │    → Split record (private)         │
+   │    → splits mapping (counters only) │
+   │                                     │
+   ├─ issue_debt(split, alice)            │
+   │    → Updated Split record           │
+   │    → Debt record ──────────────────►│
+   │       (NO ON-CHAIN TRACE)           │
+   │                                     │
+   │  Share payment link                 │
+   │  ──────────────────────────────────►│
+   │                                     ├─ pay_debt(debt, credits)
+   │                                     │    → transfer_private(to creator)
+   │◄── CreatorReceipt (proof received)  │    → PayerReceipt (proof paid)
+   │                                     │    → payment_count + 1 (on-chain)
+   │                                     │
+   ├─ settle_split(split_record)          │
+   │    → status = 1 (settled)            │
+```
+
+---
+
+## Wave 2 Progress Changelog
+
+### New in Wave 2 (Feb 11–25, 2026)
+
+**Smart Contract (New)**
+- Deployed `private_split_v1.aleo` on Aleo Testnet
+- `issue_debt` transition with NO finalize block — zero on-chain trace of debt issuance
+- 4 record types with zero amounts in public mappings
+- Cryptographic settlement: only record owner can settle (protocol-enforced)
+- Confirmed on-chain transaction: `at1ue3v4t5u9rsmf7h7jnee8dhr6dguda59lrct68j3d4rjhm395vqqhjwcxv`
+
+**Shield Wallet Integration (Wave 2 Mandatory)**
+- Full Shield Wallet support via `@provablehq/aleo-wallet-adaptor-react`
+- Real `credits.aleo/transfer_private` payments (not mocked)
+- 4-strategy split_id retrieval after transaction finalization
+- Robust record matching using structured field parsing (not fragile substring search)
+
+**Privacy Architecture**
+- Cryptographically secure salt generation via `crypto.getRandomValues()` (not `Math.random()`)
+- Backend encrypts all sensitive fields (addresses AND amounts) with AES-256-GCM
+- COOP/COEP headers for WASM isolation (required for Aleo SDK)
+- Zero private data in any finalize scope
+
+**Frontend (New)**
+- Terminal UI aesthetic (unique — JetBrains Mono, sharp borders, no blur effects)
+- 8 functional pages: Dashboard, Create, Pay, Split Detail, Explorer, Verification, History, Connect
+- Real-time transaction log on every page
+- Payment link sharing with encoded parameters
+- On-chain explorer with split ID lookup
+
+**Backend**
+- Node.js + Express + Supabase
+- AES-256-GCM encrypted storage for all sensitive fields
+- REST API for cross-device split recovery
+
+---
+
+## How to Test (Wave 2)
+
+### Prerequisites
+- [Shield Wallet](https://www.leo.app/) browser extension installed
+- Aleo Testnet credits (get from [faucet](https://faucet.aleo.org/))
+
+### Step-by-Step
+
+1. **Connect**: Visit https://privatesplit.vercel.app → `/connect` → Connect Shield Wallet
+2. **Create**: Go to `/create` → Enter description, total amount, number of participants + their addresses
+3. **Issue Debts**: On the split detail page → click "ISSUE DEBT" for each participant
+4. **Pay**: Participants follow the payment link → `/pay?...` → click "EXECUTE PAYMENT"
+5. **Verify**: Visit `/explorer` → paste split ID → see on-chain status
+6. **Settle**: Creator clicks "SETTLE SPLIT" when all payments received
+
+### Test with CLI (Advanced)
+
+```bash
+# Verify split on-chain
+curl https://api.provable.com/v2/testnet/program/private_split_v1.aleo/mapping/splits/{split_id}
+
+# View confirmed transactions
+# https://testnet.explorer.provable.com/program/private_split_v1.aleo
+```
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  FRONTEND  (React 18 + TypeScript + Vite + Tailwind)    │
+│  Live: privatesplit.vercel.app                           │
+│  Shield Wallet via @provablehq/aleo-wallet-adaptor-react │
+│  Terminal UI: JetBrains Mono, #0a0a0a bg, #00ff88 green  │
+├─────────────────────────────────────────────────────────┤
+│  LEO SMART CONTRACT  (private_split_v1.aleo)            │
+│  Aleo Testnet — 5 transitions, 4 records, 2 mappings    │
+│  Zero amounts in mappings · Zero private data in finalize│
+│  issue_debt: NO finalize (100% private operation)        │
+├─────────────────────────────────────────────────────────┤
+│  BACKEND  (Node.js + Express + Supabase)                │
+│  AES-256-GCM encrypted: addresses + amounts             │
+│  REST API for cross-device split recovery               │
+└─────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -66,64 +212,27 @@ issue_debt has NO finalize - issuing debts reveals nothing on-chain.
 
 | Layer | Technology |
 |-------|-----------|
-| Smart Contracts | Leo (Aleo) |
+| Smart Contract | Leo (Aleo) |
+| Blockchain | Aleo Testnet |
 | Frontend | React 18 + TypeScript + Vite |
-| Styling | Tailwind CSS |
+| Styling | Tailwind CSS (terminal aesthetic) |
 | State | Zustand + localStorage |
 | Wallet | Shield Wallet (primary) |
-| Backend | Node.js + Express + Supabase |
+| Backend | Node.js + Express |
+| Database | Supabase (PostgreSQL) |
 | Encryption | AES-256-GCM |
 | Deployment | Vercel |
 
 ---
 
-## How to Test
-
-1. Install Shield Wallet extension
-2. Get Aleo Testnet credits from faucet
-3. Visit live demo URL
-4. Connect wallet on /connect page
-5. Create split on /create (description, amount, participants)
-6. Issue debts from split detail page
-7. Participants pay via payment link
-8. Creator settles when done
-
----
-
-## Privacy vs Competition
-
-| Feature | Splitwise | Venmo | PrivateSplit |
-|---------|-----------|-------|-------------|
-| Server sees amounts | Yes | Yes | **No** |
-| Server sees participants | Yes | Yes | **No** |
-| Social graph exposed | Yes | Yes | **No** |
-| Cryptographic receipts | No | No | **Yes** |
-| Verifiable settlement | No | No | **Yes** |
-| Self-custody | No | No | **Yes** |
-
----
-
-## Wave 2 Progress
-
-- Full Leo contract with 5 transitions and 4 record types
-- Shield Wallet integration (Wave 2 mandatory)
-- Real credits.aleo/transfer_private payments
-- Terminal UI with unique design aesthetic
-- Backend with AES-256-GCM encrypted indexing
-- 4-strategy split ID retrieval
-- Payment link sharing flow
-- On-chain verification page
-
----
-
 ## Security
 
-- Record ownership enforced by Aleo protocol
-- Nullifiers handled automatically (no double-spending)
-- No private data in finalize blocks
-- 128-bit random salt per split
-- AES-256-GCM off-chain encryption
-- COOP/COEP headers for WASM isolation
+- Record ownership enforced by Aleo protocol at ZK proof level
+- Nullifiers prevent double-spending (automatic, no manual implementation)
+- No private data in any finalize block (verified — only anonymous counters)
+- Cryptographically secure random salt: `crypto.getRandomValues(new Uint8Array(16))`
+- AES-256-GCM with random IVs for all off-chain encrypted data
+- COOP/COEP headers prevent cross-origin data leaks
 
 ---
 

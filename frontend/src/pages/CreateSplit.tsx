@@ -21,9 +21,12 @@ export function CreateSplit() {
     participants: string[];
   }) => {
     const split = await createSplit(data);
-    if (split && split.split_id && split.split_id !== 'null') {
-      // Navigate to split detail after short delay
+    if (split && split.split_id && split.split_id !== 'null' && !split.split_id.startsWith('pending_')) {
+      // Navigate to split detail after short delay (only when we have a confirmed on-chain ID)
       setTimeout(() => navigate(`/split/${split.split_id}`), 1500);
+    } else if (split) {
+      // Split is saved locally, navigate to dashboard to wait for on-chain confirmation
+      setTimeout(() => navigate('/'), 1500);
     }
   };
 

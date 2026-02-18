@@ -28,6 +28,16 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Privacy Guarantee Banner */}
+      <div className="border border-terminal-green bg-terminal-surface p-3">
+        <p className="text-xs text-terminal-green tracking-widest uppercase mb-1">Privacy Guarantees</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[10px]">
+          <span className="text-terminal-dim">{STATUS_SYMBOLS.success} <span className="text-terminal-text">Amounts on-chain: <span className="text-terminal-green">0</span></span></span>
+          <span className="text-terminal-dim">{STATUS_SYMBOLS.success} <span className="text-terminal-text">Addresses on-chain: <span className="text-terminal-green">0</span></span></span>
+          <span className="text-terminal-dim">{STATUS_SYMBOLS.success} <span className="text-terminal-text">Debt issuance visible: <span className="text-terminal-green">0</span></span></span>
+          <span className="text-terminal-dim">{STATUS_SYMBOLS.success} <span className="text-terminal-text">Payments traceable: <span className="text-terminal-green">0</span></span></span>
+        </div>
+      </div>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

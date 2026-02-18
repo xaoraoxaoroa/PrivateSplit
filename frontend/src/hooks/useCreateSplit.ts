@@ -157,13 +157,14 @@ export function useCreateSplit() {
         addLog('Split ID retrieved from transaction output', 'success');
       }
 
-      // Strategy 2: On-chain mapping lookup (with retries)
+      // Strategy 2: On-chain mapping lookup (extended retries — finalize takes time)
       if (!splitId) {
         addLog('Looking up split ID from on-chain mapping...', 'info');
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 15; i++) {
           splitId = await getSplitIdFromMapping(salt);
           if (splitId) break;
-          await new Promise((r) => setTimeout(r, 2000));
+          await new Promise((r) => setTimeout(r, 3000));
+          if (i === 4 || i === 9) addLog(`Still waiting for finalization... (${i + 1}/15)`, 'info');
         }
         if (splitId) addLog('Split ID retrieved from mapping', 'success');
       }
@@ -202,10 +203,14 @@ export function useCreateSplit() {
         } catch { /* ignore */ }
       }
 
-      // Final fallback: local ID
+      // Final fallback: temporary local ID (cannot be used for payments until confirmed on-chain)
       if (!splitId || splitId === 'null' || splitId === 'undefined') {
-        splitId = `local_${Date.now()}_${salt.slice(0, 10)}`;
-        addLog('Split ID not yet available, using local ID (will sync later)', 'warning');
+        splitId = `pending_${salt.slice(0, 20)}`;
+        addLog(
+          'Split ID not yet confirmed on-chain. The split is saved locally and will sync once finalized. ' +
+          'You can issue debts once the transaction appears on the explorer.',
+          'warning',
+        );
       }
 
       addLog(`Split ID: ${splitId.slice(0, 24)}...`, 'info');

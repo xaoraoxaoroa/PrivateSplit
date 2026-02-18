@@ -5,6 +5,13 @@ import { PROGRAM_ID } from '../utils/constants';
 import { getSplitStatus, getSplitIdFromMapping, pollTransaction } from '../utils/aleo-utils';
 import { useUIStore } from '../store/splitStore';
 import { api } from '../services/api';
+import {
+  isDebtRecord,
+  recordMatchesSplitContext,
+  extractField,
+  getMicrocreditsFromRecord,
+  buildCreditsRecordPlaintext,
+} from '../utils/record-utils';
 import type { PaymentStep } from '../types/split';
 
 interface PayParams {
@@ -12,37 +19,6 @@ interface PayParams {
   amount: string;
   salt: string;
   splitId?: string;
-}
-
-/** Extract microcredits from a wallet record */
-function getMicrocredits(record: any): number {
-  try {
-    if (record.data?.microcredits) {
-      return parseInt(String(record.data.microcredits).replace('u64', '').replace(/_/g, ''));
-    }
-    if (record.plaintext) {
-      const match = record.plaintext.match(/microcredits:\s*([\d_]+)u64/);
-      if (match?.[1]) return parseInt(match[1].replace(/_/g, ''));
-    }
-    return 0;
-  } catch {
-    return 0;
-  }
-}
-
-/** Get the plaintext string for a record to pass as transaction input */
-function getRecordPlaintext(record: any): string | null {
-  if (record.plaintext) return record.plaintext;
-
-  // Reconstruct from parts for credits records
-  const nonce = record.nonce || record._nonce || record.data?._nonce;
-  if (nonce && record.owner) {
-    const microcredits = getMicrocredits(record);
-    return `{ owner: ${record.owner}.private, microcredits: ${microcredits}u64.private, _nonce: ${nonce}.public }`;
-  }
-
-  if (record.ciphertext) return record.ciphertext;
-  return null;
 }
 
 export function usePaySplit() {
@@ -58,14 +34,14 @@ export function usePaySplit() {
     setError(null);
 
     try {
-      // Step 1: Connect check
+      // Step 1: Wallet check
       setStep('connect');
       if (!address || !executeTransaction || !requestRecords) {
         setError('Wallet not connected');
         setStep('error');
         return false;
       }
-      addLog(`Wallet connected: ${address.slice(0, 12)}...`, 'success');
+      addLog(`Wallet: ${address.slice(0, 12)}...`, 'success');
 
       // Step 2: Verify split on-chain
       setStep('verify');
@@ -78,7 +54,7 @@ export function usePaySplit() {
 
       if (splitId) {
         const status = await getSplitStatus(splitId);
-        if (status && status.status === 1) {
+        if (status?.status === 1) {
           setError('This split is already settled');
           addLog('Split is already settled', 'error');
           setStep('error');
@@ -86,7 +62,7 @@ export function usePaySplit() {
         }
         addLog(`Split verified: ${splitId.slice(0, 20)}...`, 'success');
       } else {
-        addLog('Split ID not found in mapping, proceeding...', 'warning');
+        addLog('Split ID not found in mapping — proceeding', 'warning');
       }
 
       // Step 3: Find Debt record in wallet
@@ -96,51 +72,58 @@ export function usePaySplit() {
       let debtRecordInput: string | null = null;
       let debtAmount = 0;
 
-      try {
-        const programRecords = (await requestRecords(PROGRAM_ID)) as any[];
-        addLog(`Found ${programRecords?.length || 0} program records`, 'info');
+      // Retry up to 3 times for wallet sync
+      for (let attempt = 0; attempt < 3 && !debtRecordInput; attempt++) {
+        if (attempt > 0) {
+          addLog(`Retrying record search (attempt ${attempt + 1}/3)...`, 'info');
+          await new Promise((r) => setTimeout(r, 2500));
+        }
+        try {
+          const programRecords = (await requestRecords(PROGRAM_ID)) as any[];
+          addLog(`Found ${programRecords?.length || 0} program records`, 'info');
 
-        for (const r of programRecords || []) {
-          if (r.spent) continue;
+          for (const r of programRecords || []) {
+            if (r.spent) continue;
+            const plaintext = r.plaintext || '';
 
-          const plaintext = r.plaintext || '';
+            // Robust matching: check salt OR split_id AND must be a Debt record
+            const matches = recordMatchesSplitContext(
+              plaintext,
+              r.data,
+              params.salt,
+              splitId,
+            );
+            const isDebt = isDebtRecord(plaintext, r.data);
 
-          // Match Debt record by salt or split_id
-          const matchesSalt = plaintext.includes(params.salt) || r.data?.salt === params.salt;
-          const matchesSplitId = splitId && (plaintext.includes(splitId) || r.data?.split_id === splitId);
-
-          if (matchesSalt || matchesSplitId) {
-            // Verify this is a Debt record (has creditor field, no participant_count)
-            const isDebt = (plaintext.includes('creditor') || r.data?.creditor) &&
-                          !(plaintext.includes('participant_count') || r.data?.participant_count);
-
-            if (isDebt) {
+            if (matches && isDebt) {
               debtRecordInput = r.plaintext || r.ciphertext;
-              // Extract amount from the debt record
-              const amountMatch = plaintext.match(/amount:\s*(\d+)u64/);
-              if (amountMatch?.[1]) debtAmount = parseInt(amountMatch[1]);
-              addLog('Found matching Debt record', 'success');
+              // Extract amount precisely using field parser
+              const rawAmount = extractField(plaintext, 'amount') || extractField(plaintext, 'per_person');
+              if (rawAmount) {
+                debtAmount = parseInt(rawAmount.replace(/u64|u128/g, ''));
+              }
+              addLog(`Found Debt record (amount: ${debtAmount} microcredits)`, 'success');
               break;
             }
           }
+        } catch (err: any) {
+          addLog(`Record fetch: ${err.message}`, 'warning');
         }
-      } catch (err: any) {
-        addLog(`Record fetch: ${err.message}`, 'warning');
       }
 
       if (!debtRecordInput) {
-        setError('No Debt record found in your wallet. The split creator must issue a debt to you first.');
+        setError('No Debt record found in your wallet. The split creator must issue a debt to you first. If they just issued it, wait a moment and try again.');
         addLog('Debt record not found — creator must issue debt first', 'error');
         setStep('error');
         return false;
       }
 
-      // Step 4: Find suitable credits record
+      // Step 4: Find credits record with sufficient balance
       addLog('Searching for private credit records...', 'system');
 
-      const amountMicro = debtAmount || parseInt(params.amount);
+      const amountNeeded = debtAmount || parseInt(params.amount);
+      let records: any[] = [];
 
-      let records: any[];
       try {
         records = (await requestRecords('credits.aleo')) as any[];
         addLog(`Found ${records?.length || 0} credit records`, 'info');
@@ -154,39 +137,38 @@ export function usePaySplit() {
       let payRecord: any = null;
       for (const r of records || []) {
         if (r.spent) continue;
+        let val = getMicrocreditsFromRecord(r);
 
-        let val = getMicrocredits(r);
-
-        // Try decrypting if no plaintext
+        // Try decrypting if no readable plaintext
         if (val === 0 && r.recordCiphertext && !r.plaintext && decrypt) {
           try {
             const decrypted = await decrypt(r.recordCiphertext);
             if (decrypted) {
               r.plaintext = decrypted;
-              val = getMicrocredits(r);
+              val = getMicrocreditsFromRecord(r);
             }
           } catch { /* continue */ }
         }
 
-        if (val > amountMicro) {
+        if (val > amountNeeded) {
           payRecord = r;
-          addLog(`Found credits record with ${val} microcredits`, 'success');
+          addLog(`Found credits record: ${val} microcredits`, 'success');
           break;
         }
       }
 
-      // Retry once after a short delay (records may be syncing)
+      // One retry after delay
       if (!payRecord) {
-        addLog('No suitable credits record found, retrying...', 'warning');
-        await new Promise((r) => setTimeout(r, 2000));
+        addLog('No suitable credits record found — retrying after 3s...', 'warning');
+        await new Promise((r) => setTimeout(r, 3000));
         try {
           records = (await requestRecords('credits.aleo')) as any[];
           for (const r of records || []) {
             if (r.spent) continue;
-            const val = getMicrocredits(r);
-            if (val > amountMicro) {
+            const val = getMicrocreditsFromRecord(r);
+            if (val > amountNeeded) {
               payRecord = r;
-              addLog(`Found credits record with ${val} microcredits on retry`, 'success');
+              addLog(`Found credits record on retry: ${val} microcredits`, 'success');
               break;
             }
           }
@@ -194,15 +176,18 @@ export function usePaySplit() {
       }
 
       if (!payRecord) {
-        addLog('No private record large enough. Try converting public credits first.', 'error');
-        setError(`No private credit record with > ${amountMicro} microcredits. Convert public credits to private first.`);
+        setError(
+          `No private credit record with > ${amountNeeded} microcredits. ` +
+          `You need ${(amountNeeded / 1_000_000).toFixed(6)} credits. ` +
+          `Convert public credits to private first (use the Aleo faucet or Shield Wallet).`
+        );
         setStep('error');
         return false;
       }
 
-      const creditsInput = getRecordPlaintext(payRecord);
+      const creditsInput = buildCreditsRecordPlaintext(payRecord);
       if (!creditsInput) {
-        setError('Could not extract credits record data. Try refreshing wallet.');
+        setError('Could not extract credits record data. Try refreshing your wallet.');
         setStep('error');
         return false;
       }
@@ -211,11 +196,9 @@ export function usePaySplit() {
       setStep('pay');
       addLog('Executing pay_debt transaction...', 'system');
 
-      // pay_debt takes exactly 2 inputs: Debt record + credits record
       const inputs = [debtRecordInput, creditsInput];
-
-      addLog(`Debt record: ${debtRecordInput.slice(0, 40)}...`, 'info');
-      addLog(`Credits record: ${creditsInput.slice(0, 40)}...`, 'info');
+      addLog(`Debt: ${debtRecordInput.slice(0, 40)}...`, 'info');
+      addLog(`Credits: ${creditsInput.slice(0, 40)}...`, 'info');
 
       const transaction: TransactionOptions = {
         program: PROGRAM_ID,
@@ -235,7 +218,6 @@ export function usePaySplit() {
       // Poll for confirmation
       if (resultTxId) {
         addLog('Waiting for on-chain confirmation...', 'system');
-
         let confirmed = false;
 
         if (wallet?.adapter?.transactionStatus) {
@@ -259,10 +241,7 @@ export function usePaySplit() {
               } else if (statusStr === 'failed' || statusStr === 'rejected') {
                 throw new Error('Transaction rejected on-chain');
               }
-
-              if (attempts % 10 === 0) {
-                addLog(`Polling... attempt ${attempts}/120`, 'info');
-              }
+              if (attempts % 10 === 0) addLog(`Polling... ${attempts}/120`, 'info');
             } catch (pollErr: any) {
               if (pollErr?.message?.includes('rejected')) throw pollErr;
             }
@@ -274,16 +253,14 @@ export function usePaySplit() {
         if (confirmed) {
           addLog('Payment confirmed on-chain!', 'success');
           setStep('success');
-
           if (splitId) {
             api.updateSplit(splitId, {
               payment_count: (await getSplitStatus(splitId))?.payment_count || 1,
             }).catch(() => {});
           }
-
           return true;
         } else {
-          addLog('Transaction polling timed out. Check explorer.', 'warning');
+          addLog('Polling timed out. Check explorer for confirmation.', 'warning');
           setStep('success');
           return true;
         }

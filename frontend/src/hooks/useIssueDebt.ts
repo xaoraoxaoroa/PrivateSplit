@@ -4,6 +4,7 @@ import { TransactionOptions } from '@provablehq/aleo-types';
 import { PROGRAM_ID } from '../utils/constants';
 import { pollTransaction } from '../utils/aleo-utils';
 import { useSplitStore, useUIStore } from '../store/splitStore';
+import { isSplitRecord, recordMatchesSplitContext } from '../utils/record-utils';
 
 export function useIssueDebt() {
   const { address, executeTransaction, requestRecords, wallet } = useWallet();
@@ -23,41 +24,46 @@ export function useIssueDebt() {
     addLog(`Issuing debt to ${participant.slice(0, 12)}...`, 'system');
 
     try {
-      // Find the Split record for this splitId
       addLog('Requesting Split records from wallet...', 'system');
       let splitRecordInput: string | null = null;
 
-      try {
-        const records = (await requestRecords(PROGRAM_ID)) as any[];
-        addLog(`Found ${records?.length || 0} program records`, 'info');
+      // Retry record fetch up to 3 times (wallet may be syncing)
+      for (let attempt = 0; attempt < 3 && !splitRecordInput; attempt++) {
+        if (attempt > 0) {
+          addLog(`Retrying record fetch (attempt ${attempt + 1}/3)...`, 'info');
+          await new Promise((r) => setTimeout(r, 2000));
+        }
+        try {
+          const records = (await requestRecords(PROGRAM_ID)) as any[];
+          addLog(`Found ${records?.length || 0} program records`, 'info');
 
-        for (const r of records || []) {
-          if (r.spent) continue;
+          for (const r of records || []) {
+            if (r.spent) continue;
+            const plaintext = r.plaintext || '';
 
-          const plaintext = r.plaintext || '';
-          // Match split_id in the record plaintext
-          if (plaintext.includes(splitId) || r.data?.split_id === splitId) {
-            // Verify this is a Split record (has participant_count field)
-            if (plaintext.includes('participant_count') || r.data?.participant_count) {
+            // Use robust matching: must match split context AND be a Split record
+            const matchesSplit = recordMatchesSplitContext(plaintext, r.data, '', splitId);
+            const isSplit = isSplitRecord(plaintext, r.data);
+
+            if (matchesSplit && isSplit) {
               splitRecordInput = r.plaintext || r.ciphertext;
               addLog('Found matching Split record', 'success');
               break;
             }
           }
+        } catch (err: any) {
+          addLog(`Record fetch: ${err.message}`, 'warning');
         }
-      } catch (err: any) {
-        addLog(`Record fetch: ${err.message}`, 'warning');
       }
 
       if (!splitRecordInput) {
-        setError('Split record not found in wallet. The wallet may need to sync.');
-        addLog('Split record not found — wallet may need to sync', 'error');
+        setError('Split record not found in wallet. The wallet may need a moment to sync — please try again in a few seconds.');
+        addLog('Split record not found — wallet sync may be needed', 'error');
         setLoading(false);
         return false;
       }
 
-      // issue_debt is a pure private transition (no async/finalize)
-      // Inputs: Split record, participant address
+      // issue_debt: Split record + participant address
       const inputs = [splitRecordInput, participant];
 
       addLog('Executing issue_debt transaction...', 'system');
@@ -74,7 +80,7 @@ export function useIssueDebt() {
       const txResult = await executeTransaction(transaction);
 
       const txId = txResult?.transactionId;
-      addLog(`Issue debt transaction submitted: ${txId}`, 'success');
+      addLog(`Issue debt submitted: ${txId}`, 'success');
 
       if (txId) {
         let confirmed = false;
@@ -96,10 +102,7 @@ export function useIssueDebt() {
               } else if (statusStr === 'failed' || statusStr === 'rejected') {
                 throw new Error('Issue debt transaction rejected');
               }
-
-              if (attempts % 15 === 0) {
-                addLog(`Polling... attempt ${attempts}/120`, 'info');
-              }
+              if (attempts % 15 === 0) addLog(`Polling... ${attempts}/120`, 'info');
             } catch (pollErr: any) {
               if (pollErr?.message?.includes('rejected')) throw pollErr;
             }
@@ -109,8 +112,7 @@ export function useIssueDebt() {
         }
 
         if (confirmed) {
-          addLog(`Debt issued to ${participant.slice(0, 12)}...!`, 'success');
-          // Update local state — increment issued count
+          addLog(`Debt issued to ${participant.slice(0, 12)}...`, 'success');
           const store = useSplitStore.getState();
           const split = store.getSplit(splitId);
           if (split) {
@@ -118,8 +120,8 @@ export function useIssueDebt() {
           }
           return true;
         } else {
-          addLog('Polling timed out. Check explorer.', 'warning');
-          return true; // TX was submitted, may still confirm
+          addLog('Polling timed out — TX may still confirm', 'warning');
+          return true;
         }
       }
       return false;

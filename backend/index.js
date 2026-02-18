@@ -128,8 +128,8 @@ app.post('/api/splits', async (req, res) => {
     const record = {
       split_id,
       creator: encrypt(creator),
-      total_amount,
-      per_person,
+      total_amount: encrypt(String(total_amount)),   // Encrypt financial data
+      per_person: encrypt(String(per_person)),        // Encrypt financial data
       participant_count,
       salt,
       description: description || '',
@@ -177,11 +177,18 @@ app.patch('/api/splits/:splitId', async (req, res) => {
 
 function decryptSplit(row) {
   if (!row) return row;
+  // Helper: try to decrypt, fall back to raw value (handles legacy unencrypted rows)
+  const tryDecrypt = (val) => {
+    if (!val) return val;
+    try { return decrypt(String(val)); } catch { return val; }
+  };
   return {
     ...row,
-    creator: decrypt(row.creator),
+    creator: tryDecrypt(row.creator),
+    total_amount: parseInt(tryDecrypt(row.total_amount)) || row.total_amount,
+    per_person: parseInt(tryDecrypt(row.per_person)) || row.per_person,
     participants: Array.isArray(row.participants)
-      ? row.participants.map((p) => (typeof p === 'string' ? decrypt(p) : p))
+      ? row.participants.map((p) => (typeof p === 'string' ? tryDecrypt(p) : p))
       : [],
   };
 }

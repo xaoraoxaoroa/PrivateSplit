@@ -5,6 +5,7 @@ import { PROGRAM_ID } from '../utils/constants';
 import { pollTransaction } from '../utils/aleo-utils';
 import { useSplitStore, useUIStore } from '../store/splitStore';
 import { api } from '../services/api';
+import { isSplitRecord, recordMatchesSplitContext } from '../utils/record-utils';
 
 export function useSettleSplit() {
   const { address, executeTransaction, requestRecords, wallet } = useWallet();
@@ -24,33 +25,41 @@ export function useSettleSplit() {
     addLog('Settling split...', 'system');
 
     try {
-      // Request Split records from our program to find the one to settle
       addLog('Requesting Split records from wallet...', 'system');
       let splitRecordInput: string | null = null;
 
-      try {
-        const records = (await requestRecords(PROGRAM_ID)) as any[];
-        addLog(`Found ${records?.length || 0} program records`, 'info');
-
-        // Find the Split record matching this splitId
-        for (const r of records || []) {
-          if (r.spent) continue;
-
-          const plaintext = r.plaintext || '';
-          // Match split_id in the record plaintext
-          if (plaintext.includes(splitId) || r.data?.split_id === splitId) {
-            splitRecordInput = r.plaintext || r.ciphertext;
-            addLog('Found matching Split record', 'success');
-            break;
-          }
+      // Retry fetch up to 3 times
+      for (let attempt = 0; attempt < 3 && !splitRecordInput; attempt++) {
+        if (attempt > 0) {
+          addLog(`Retrying record fetch (attempt ${attempt + 1}/3)...`, 'info');
+          await new Promise((r) => setTimeout(r, 2000));
         }
-      } catch (err: any) {
-        addLog(`Record fetch: ${err.message}`, 'warning');
+        try {
+          const records = (await requestRecords(PROGRAM_ID)) as any[];
+          addLog(`Found ${records?.length || 0} program records`, 'info');
+
+          for (const r of records || []) {
+            if (r.spent) continue;
+            const plaintext = r.plaintext || '';
+
+            // Must match this split AND be a Split record (not Debt/Receipt)
+            const matchesSplit = recordMatchesSplitContext(plaintext, r.data, '', splitId);
+            const isSplit = isSplitRecord(plaintext, r.data);
+
+            if (matchesSplit && isSplit) {
+              splitRecordInput = r.plaintext || r.ciphertext;
+              addLog('Found matching Split record', 'success');
+              break;
+            }
+          }
+        } catch (err: any) {
+          addLog(`Record fetch: ${err.message}`, 'warning');
+        }
       }
 
       if (!splitRecordInput) {
-        setError('Split record not found in wallet. The wallet may need to sync.');
-        addLog('Split record not found — wallet may need to sync', 'error');
+        setError('Split record not found in wallet. The wallet may need a moment to sync — please try again shortly.');
+        addLog('Split record not found — wallet sync may be needed', 'error');
         setLoading(false);
         return false;
       }
@@ -73,7 +82,6 @@ export function useSettleSplit() {
       addLog(`Settle transaction submitted: ${txId}`, 'success');
 
       if (txId) {
-        // Use wallet adapter polling if available
         let confirmed = false;
 
         if (wallet?.adapter?.transactionStatus) {
@@ -93,10 +101,7 @@ export function useSettleSplit() {
               } else if (statusStr === 'failed' || statusStr === 'rejected') {
                 throw new Error('Settle transaction rejected');
               }
-
-              if (attempts % 15 === 0) {
-                addLog(`Polling... attempt ${attempts}/120`, 'info');
-              }
+              if (attempts % 15 === 0) addLog(`Polling... ${attempts}/120`, 'info');
             } catch (pollErr: any) {
               if (pollErr?.message?.includes('rejected')) throw pollErr;
             }
