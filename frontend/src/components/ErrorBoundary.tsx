@@ -23,11 +23,11 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="bg-terminal-bg border border-terminal-red p-6 m-4 font-mono">
-          <p className="text-terminal-red text-sm tracking-wider mb-2">
-            &gt; SYSTEM ERROR
+        <div className="glass-card glass-card-error p-6 m-4">
+          <p className="text-terminal-red text-sm font-medium mb-2">
+            System Error
           </p>
-          <p className="text-terminal-dim text-xs mb-4">
+          <p className="text-terminal-dim text-xs mb-4 font-mono">
             {this.state.error?.message || 'An unexpected error occurred'}
           </p>
           <button
@@ -35,9 +35,9 @@ export class ErrorBoundary extends Component<Props, State> {
               this.setState({ hasError: false, error: null });
               window.location.reload();
             }}
-            className="border border-terminal-red text-terminal-red px-4 py-2 text-xs tracking-widest uppercase hover:bg-terminal-red hover:text-terminal-bg transition-colors"
+            className="bg-terminal-red/10 border border-terminal-red/40 text-terminal-red px-5 py-2.5 text-xs font-medium tracking-wider uppercase rounded-glass-sm hover:bg-terminal-red hover:text-terminal-bg transition-all"
           >
-            [ REBOOT ]
+            RELOAD
           </button>
         </div>
       );

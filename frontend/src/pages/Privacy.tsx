@@ -7,22 +7,22 @@ export function Privacy() {
     <div className="max-w-4xl mx-auto space-y-8 animate-fade-in">
       {/* Header */}
       <div>
-        <h1 className="text-lg text-terminal-green tracking-wider">HOW PRIVACY WORKS</h1>
+        <h1 className="text-xl font-bold text-gradient">How Privacy Works</h1>
         <p className="text-xs text-terminal-dim mt-1">
-          Every expense amount, every participant, every debt — encrypted using zero-knowledge proofs
+          Every expense amount, every participant, every debt &mdash; encrypted using zero-knowledge proofs
         </p>
       </div>
 
       {/* The Core Insight */}
       <TerminalCard title="THE PRIVACY GUARANTEE">
-        <div className="font-mono text-xs space-y-3">
-          <p className="text-terminal-green">
+        <div className="text-xs space-y-3">
+          <p className="text-terminal-green font-medium">
             PrivateSplit stores ZERO amounts and ZERO addresses in any public mapping.
           </p>
           <p className="text-terminal-dim">
             When you split a $120 dinner with 3 friends, all an on-chain observer can see is:
           </p>
-          <div className="bg-terminal-bg border border-terminal-border p-4 space-y-1 mt-2">
+          <div className="bg-terminal-bg/60 border border-white/[0.06] rounded-glass-sm p-4 font-mono space-y-1 mt-2">
             <p className="text-terminal-dim">// What the Aleo blockchain shows:</p>
             <p className="text-terminal-text">splits[0x4a8f...] = {'{'}</p>
             <p className="text-terminal-text pl-4">participant_count: <span className="text-terminal-green">3</span></p>
@@ -37,48 +37,38 @@ export function Privacy() {
       {/* What's Visible vs Hidden */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <TerminalCard title="WHAT AN OBSERVER SEES">
-          <div className="space-y-2 text-xs">
-            <div className="flex items-start gap-2">
-              <span className="text-terminal-amber shrink-0">{STATUS_SYMBOLS.pending}</span>
-              <span className="text-terminal-dim">A split exists (anonymous field ID)</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-terminal-amber shrink-0">{STATUS_SYMBOLS.pending}</span>
-              <span className="text-terminal-dim">3 people are involved (just a count)</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-terminal-amber shrink-0">{STATUS_SYMBOLS.pending}</span>
-              <span className="text-terminal-dim">2 have paid (just a count)</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-terminal-amber shrink-0">{STATUS_SYMBOLS.pending}</span>
-              <span className="text-terminal-dim">It's still active (0 or 1)</span>
-            </div>
-            <div className="border-t border-terminal-border pt-2 mt-3">
+          <div className="space-y-2.5 text-xs">
+            {[
+              'A split exists (anonymous field ID)',
+              '3 people are involved (just a count)',
+              '2 have paid (just a count)',
+              'It\'s still active (0 or 1)',
+            ].map((item, i) => (
+              <div key={i} className="flex items-start gap-2">
+                <span className="text-terminal-amber shrink-0">{STATUS_SYMBOLS.pending}</span>
+                <span className="text-terminal-dim">{item}</span>
+              </div>
+            ))}
+            <div className="border-t border-white/[0.06] pt-3 mt-3">
               <p className="text-terminal-dim">That's ALL. No amounts, no addresses, no names, no history.</p>
             </div>
           </div>
         </TerminalCard>
 
         <TerminalCard title="WHAT PARTICIPANTS SEE" variant="accent">
-          <div className="space-y-2 text-xs">
-            <div className="flex items-start gap-2">
-              <span className="text-terminal-green shrink-0">{STATUS_SYMBOLS.success}</span>
-              <span className="text-terminal-text">Creator: total $120, each person owes $40</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-terminal-green shrink-0">{STATUS_SYMBOLS.success}</span>
-              <span className="text-terminal-text">Debtor: "I owe Alice $40 for dinner"</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-terminal-green shrink-0">{STATUS_SYMBOLS.success}</span>
-              <span className="text-terminal-text">Payer: encrypted receipt proving payment</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-terminal-green shrink-0">{STATUS_SYMBOLS.success}</span>
-              <span className="text-terminal-text">Creator: encrypted receipt proving receipt</span>
-            </div>
-            <div className="border-t border-terminal-border pt-2 mt-3">
+          <div className="space-y-2.5 text-xs">
+            {[
+              'Creator: total $120, each person owes $40',
+              'Debtor: "I owe Alice $40 for dinner"',
+              'Payer: encrypted receipt proving payment',
+              'Creator: encrypted receipt proving receipt',
+            ].map((item, i) => (
+              <div key={i} className="flex items-start gap-2">
+                <span className="text-terminal-green shrink-0">{STATUS_SYMBOLS.success}</span>
+                <span className="text-terminal-text">{item}</span>
+              </div>
+            ))}
+            <div className="border-t border-white/[0.06] pt-3 mt-3">
               <p className="text-terminal-green">All stored in encrypted Aleo records. Only you can decrypt yours.</p>
             </div>
           </div>
@@ -138,133 +128,75 @@ export function Privacy() {
           <table className="w-full text-xs">
             <thead>
               <tr className="text-terminal-dim text-left">
-                <th className="pb-2 pr-4">Data Point</th>
-                <th className="pb-2 pr-4">Splitwise</th>
-                <th className="pb-2 pr-4">Venmo</th>
-                <th className="pb-2 pr-4">Other ZK Apps</th>
-                <th className="pb-2 text-terminal-green">PrivateSplit</th>
+                <th className="pb-3 pr-4 font-medium">Data Point</th>
+                <th className="pb-3 pr-4 font-medium">Splitwise</th>
+                <th className="pb-3 pr-4 font-medium">Venmo</th>
+                <th className="pb-3 pr-4 font-medium">Other ZK</th>
+                <th className="pb-3 text-terminal-green font-medium">PrivateSplit</th>
               </tr>
             </thead>
             <tbody className="text-terminal-text">
-              <tr className="border-t border-terminal-border">
-                <td className="py-2 pr-4 text-terminal-dim">Amounts visible</td>
-                <td className="py-2 pr-4 text-terminal-red">Server sees all</td>
-                <td className="py-2 pr-4 text-terminal-red">Server sees all</td>
-                <td className="py-2 pr-4 text-terminal-amber">Public inputs</td>
-                <td className="py-2 text-terminal-green font-bold">NEVER</td>
-              </tr>
-              <tr className="border-t border-terminal-border">
-                <td className="py-2 pr-4 text-terminal-dim">Addresses visible</td>
-                <td className="py-2 pr-4 text-terminal-red">Server sees all</td>
-                <td className="py-2 pr-4 text-terminal-red">Public by default</td>
-                <td className="py-2 pr-4 text-terminal-amber">Public inputs</td>
-                <td className="py-2 text-terminal-green font-bold">NEVER</td>
-              </tr>
-              <tr className="border-t border-terminal-border">
-                <td className="py-2 pr-4 text-terminal-dim">Who owes whom</td>
-                <td className="py-2 pr-4 text-terminal-red">Server stores</td>
-                <td className="py-2 pr-4 text-terminal-red">N/A</td>
-                <td className="py-2 pr-4 text-terminal-amber">On-chain hash</td>
-                <td className="py-2 text-terminal-green font-bold">NO TRACE</td>
-              </tr>
-              <tr className="border-t border-terminal-border">
-                <td className="py-2 pr-4 text-terminal-dim">Social graph</td>
-                <td className="py-2 pr-4 text-terminal-red">Fully mapped</td>
-                <td className="py-2 pr-4 text-terminal-red">Fully mapped</td>
-                <td className="py-2 pr-4 text-terminal-amber">Partial</td>
-                <td className="py-2 text-terminal-green font-bold">HIDDEN</td>
-              </tr>
-              <tr className="border-t border-terminal-border">
-                <td className="py-2 pr-4 text-terminal-dim">Payment proof</td>
-                <td className="py-2 pr-4 text-terminal-dim">None</td>
-                <td className="py-2 pr-4 text-terminal-dim">None</td>
-                <td className="py-2 pr-4 text-terminal-green">Yes</td>
-                <td className="py-2 text-terminal-green font-bold">ENCRYPTED RECEIPTS</td>
-              </tr>
-              <tr className="border-t border-terminal-border">
-                <td className="py-2 pr-4 text-terminal-dim">Self-custody</td>
-                <td className="py-2 pr-4 text-terminal-dim">No</td>
-                <td className="py-2 pr-4 text-terminal-dim">No</td>
-                <td className="py-2 pr-4 text-terminal-green">Yes</td>
-                <td className="py-2 text-terminal-green font-bold">YES</td>
-              </tr>
+              {[
+                { point: 'Amounts visible', sw: 'Server sees all', venmo: 'Server sees all', zk: 'Public inputs', ps: 'NEVER' },
+                { point: 'Addresses visible', sw: 'Server sees all', venmo: 'Public by default', zk: 'Public inputs', ps: 'NEVER' },
+                { point: 'Who owes whom', sw: 'Server stores', venmo: 'N/A', zk: 'On-chain hash', ps: 'NO TRACE' },
+                { point: 'Social graph', sw: 'Fully mapped', venmo: 'Fully mapped', zk: 'Partial', ps: 'HIDDEN' },
+                { point: 'Payment proof', sw: 'None', venmo: 'None', zk: 'Yes', ps: 'ENCRYPTED RECEIPTS' },
+                { point: 'Self-custody', sw: 'No', venmo: 'No', zk: 'Yes', ps: 'YES' },
+              ].map((row, i) => (
+                <tr key={i} className="border-t border-white/[0.06]">
+                  <td className="py-2.5 pr-4 text-terminal-dim">{row.point}</td>
+                  <td className="py-2.5 pr-4 text-terminal-red/80">{row.sw}</td>
+                  <td className="py-2.5 pr-4 text-terminal-red/80">{row.venmo}</td>
+                  <td className="py-2.5 pr-4 text-terminal-amber/80">{row.zk}</td>
+                  <td className="py-2.5 text-terminal-green font-semibold">{row.ps}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </TerminalCard>
 
-      {/* Technical Deep Dive */}
+      {/* Technical Details */}
       <TerminalCard title="TECHNICAL DETAILS">
-        <div className="space-y-4 text-xs">
-          <div>
-            <p className="text-terminal-green tracking-widest uppercase mb-1">Record Model (UTXO-like)</p>
-            <p className="text-terminal-dim">
-              Aleo records are consumed and recreated on each transition. Only the owner can spend them.
-              Nullifiers prevent double-spending. Encryption is automatic — no application logic needed.
-            </p>
-          </div>
-          <div>
-            <p className="text-terminal-green tracking-widest uppercase mb-1">Zero-Knowledge Proofs</p>
-            <p className="text-terminal-dim">
-              Every transition generates a ZK proof that the computation was correct without revealing
-              the inputs. Validators verify the proof, not the data.
-            </p>
-          </div>
-          <div>
-            <p className="text-terminal-green tracking-widest uppercase mb-1">credits.aleo/transfer_private</p>
-            <p className="text-terminal-dim">
-              Payments use Aleo's native private transfer. Sender identity, receiver identity, and
-              amount are all hidden. Observers see only that a transfer occurred.
-            </p>
-          </div>
-          <div>
-            <p className="text-terminal-green tracking-widest uppercase mb-1">No Finalize on Debt Issuance</p>
-            <p className="text-terminal-dim">
-              The <code className="text-terminal-text">issue_debt</code> transition has no finalize block.
-              This means there is literally zero on-chain evidence that a debt was issued.
-              The encrypted Debt record appears only in the participant's wallet.
-            </p>
-          </div>
+        <div className="space-y-5 text-xs">
+          {[
+            { title: 'Record Model (UTXO-like)', desc: 'Aleo records are consumed and recreated on each transition. Only the owner can spend them. Nullifiers prevent double-spending. Encryption is automatic.', color: 'text-terminal-green' },
+            { title: 'Zero-Knowledge Proofs', desc: 'Every transition generates a ZK proof that the computation was correct without revealing the inputs. Validators verify the proof, not the data.', color: 'text-terminal-cyan' },
+            { title: 'credits.aleo/transfer_private', desc: 'Payments use Aleo\'s native private transfer. Sender identity, receiver identity, and amount are all hidden.', color: 'text-terminal-purple' },
+            { title: 'No Finalize on Debt Issuance', desc: 'The issue_debt transition has no finalize block. There is literally zero on-chain evidence that a debt was issued. The encrypted Debt record appears only in the participant\'s wallet.', color: 'text-terminal-amber' },
+          ].map((item, i) => (
+            <div key={i}>
+              <p className={`${item.color} tracking-wider uppercase mb-1.5 font-medium`}>{item.title}</p>
+              <p className="text-terminal-dim leading-relaxed">{item.desc}</p>
+            </div>
+          ))}
         </div>
       </TerminalCard>
 
       {/* Program Info */}
       <TerminalCard title="ON-CHAIN PROGRAM">
         <div className="space-y-2 text-xs">
-          <div className="flex justify-between">
-            <span className="text-terminal-dim">Program ID</span>
-            <span className="text-terminal-text">{PROGRAM_ID}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-terminal-dim">Network</span>
-            <span className="text-terminal-cyan">Aleo Testnet</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-terminal-dim">Transitions</span>
-            <span className="text-terminal-text">5 (create, issue, pay, settle, verify)</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-terminal-dim">Records</span>
-            <span className="text-terminal-text">4 (Split, Debt, PayerReceipt, CreatorReceipt)</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-terminal-dim">Public Mappings</span>
-            <span className="text-terminal-text">2 (anonymous counters only)</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-terminal-dim">Amounts in Mappings</span>
-            <span className="text-terminal-green font-bold">0</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-terminal-dim">Addresses in Mappings</span>
-            <span className="text-terminal-green font-bold">0</span>
-          </div>
-          <div className="border-t border-terminal-border pt-2 mt-2">
+          {[
+            { label: 'Program ID', value: PROGRAM_ID, mono: true },
+            { label: 'Network', value: 'Aleo Testnet', color: 'text-terminal-cyan' },
+            { label: 'Transitions', value: '5 (create, issue, pay, settle, verify)' },
+            { label: 'Records', value: '4 (Split, Debt, PayerReceipt, CreatorReceipt)' },
+            { label: 'Public Mappings', value: '2 (anonymous counters only)' },
+            { label: 'Amounts in Mappings', value: '0', color: 'text-terminal-green font-semibold' },
+            { label: 'Addresses in Mappings', value: '0', color: 'text-terminal-green font-semibold' },
+          ].map((item, i) => (
+            <div key={i} className="flex justify-between">
+              <span className="text-terminal-dim">{item.label}</span>
+              <span className={item.color || (item.mono ? 'text-terminal-text font-mono' : 'text-terminal-text')}>{item.value}</span>
+            </div>
+          ))}
+          <div className="border-t border-white/[0.06] pt-3 mt-3">
             <a
               href={`https://testnet.explorer.provable.com/program/${PROGRAM_ID}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-terminal-cyan hover:underline"
+              className="text-terminal-cyan hover:text-terminal-green transition-colors"
             >
               {STATUS_SYMBOLS.arrow} View contract on Provable Explorer
             </a>

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { TerminalCard, TerminalInput, TerminalButton, TerminalBadge } from '../components/ui';
 import { getSplitStatus, getSplitIdFromMapping } from '../utils/aleo-utils';
-import { microToCredits } from '../utils/format';
 import { STATUS_SYMBOLS } from '../design-system/tokens';
 import { PROGRAM_ID, TESTNET_API } from '../utils/constants';
 
@@ -36,7 +35,6 @@ export function Explorer() {
 
     try {
       if (searchType === 'salt') {
-        // Look up split_id from salt mapping
         const splitId = await getSplitIdFromMapping(query.trim());
         if (!splitId) {
           setError('No split found for this salt');
@@ -75,10 +73,16 @@ export function Explorer() {
     }
   };
 
+  const searchTypes = [
+    { key: 'split_id' as const, label: 'Split ID' },
+    { key: 'salt' as const, label: 'Salt' },
+    { key: 'tx' as const, label: 'TX Hash' },
+  ];
+
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-lg text-terminal-green tracking-wider">EXPLORER</h1>
+        <h1 className="text-xl font-bold text-gradient">Explorer</h1>
         <p className="text-xs text-terminal-dim mt-1">
           Verify splits and transactions on-chain
         </p>
@@ -86,19 +90,19 @@ export function Explorer() {
 
       {/* Search */}
       <TerminalCard title="ON-CHAIN LOOKUP">
-        <div className="space-y-3">
-          <div className="flex items-center gap-1">
-            {(['split_id', 'salt', 'tx'] as const).map((t) => (
+        <div className="space-y-4">
+          <div className="flex items-center gap-1.5">
+            {searchTypes.map((t) => (
               <button
-                key={t}
-                onClick={() => { setSearchType(t); setSplitResult(null); setTxResult(null); setError(null); }}
-                className={`px-3 py-1 text-xs tracking-wider border transition-colors ${
-                  searchType === t
-                    ? 'border-terminal-green text-terminal-green'
-                    : 'border-terminal-border text-terminal-dim hover:text-terminal-text'
+                key={t.key}
+                onClick={() => { setSearchType(t.key); setSplitResult(null); setTxResult(null); setError(null); }}
+                className={`px-3 py-1.5 text-xs font-medium tracking-wide rounded-lg border transition-colors ${
+                  searchType === t.key
+                    ? 'border-terminal-green/40 text-terminal-green bg-terminal-green/10'
+                    : 'border-white/[0.06] text-terminal-dim hover:text-terminal-text hover:bg-white/[0.03]'
                 }`}
               >
-                {t === 'split_id' ? 'SPLIT ID' : t === 'salt' ? 'SALT' : 'TX HASH'}
+                {t.label}
               </button>
             ))}
           </div>
@@ -130,19 +134,19 @@ export function Explorer() {
             <p className="text-terminal-dim">Try one of these confirmed on-chain items:</p>
             <button
               onClick={() => { setQuery('1904758949858929157912240259749859140762221531679669196161601694830550064831field'); setSearchType('split_id'); }}
-              className="block text-terminal-cyan hover:underline text-left break-all"
+              className="block text-terminal-cyan hover:text-terminal-green text-left break-all transition-colors"
             >
               {STATUS_SYMBOLS.arrow} Split: 19047589498...064831field
             </button>
             <button
               onClick={() => { setQuery('987654321098765field'); setSearchType('salt'); }}
-              className="block text-terminal-cyan hover:underline text-left"
+              className="block text-terminal-cyan hover:text-terminal-green text-left transition-colors"
             >
               {STATUS_SYMBOLS.arrow} Salt: 987654321098765field
             </button>
             <button
               onClick={() => { setQuery('at1ue3v4t5u9rsmf7h7jnee8dhr6dguda59lrct68j3d4rjhm395vqqhjwcxv'); setSearchType('tx'); }}
-              className="block text-terminal-cyan hover:underline text-left break-all"
+              className="block text-terminal-cyan hover:text-terminal-green text-left break-all transition-colors"
             >
               {STATUS_SYMBOLS.arrow} TX: at1ue3v4t5u...hjwcxv
             </button>
@@ -153,8 +157,8 @@ export function Explorer() {
       {/* Error */}
       {error && (
         <TerminalCard variant="error">
-          <p className="text-xs text-terminal-red">
-            {STATUS_SYMBOLS.error} {error}
+          <p className="text-xs text-terminal-red flex items-center gap-2">
+            <span>{STATUS_SYMBOLS.error}</span> {error}
           </p>
         </TerminalCard>
       )}
@@ -165,11 +169,11 @@ export function Explorer() {
           <div className="space-y-3">
             <div className="flex justify-between text-xs">
               <span className="text-terminal-dim">Split ID</span>
-              <span className="text-terminal-text break-all text-right max-w-[60%]">
+              <span className="text-terminal-text break-all text-right max-w-[60%] font-mono">
                 {splitResult.split_id}
               </span>
             </div>
-            <div className="flex justify-between text-xs">
+            <div className="flex justify-between text-xs items-center">
               <span className="text-terminal-dim">Status</span>
               <TerminalBadge status={splitResult.status === 1 ? 'settled' : 'active'} />
             </div>
@@ -179,28 +183,30 @@ export function Explorer() {
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-terminal-dim">Payments Received</span>
-              <span className="text-terminal-green">
+              <span className="text-terminal-green font-mono">
                 {splitResult.payment_count} / {splitResult.participant_count - 1}
               </span>
             </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-terminal-dim">Completion</span>
-              <span className="text-terminal-text">
-                {Math.round((splitResult.payment_count / Math.max(splitResult.participant_count - 1, 1)) * 100)}%
-              </span>
+
+            {/* Progress bar */}
+            <div className="w-full h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
+              <div
+                className="h-full bg-terminal-green rounded-full transition-all"
+                style={{ width: `${Math.round((splitResult.payment_count / Math.max(splitResult.participant_count - 1, 1)) * 100)}%` }}
+              />
             </div>
 
-            <div className="border-t border-terminal-border pt-3">
-              <p className="text-[10px] text-terminal-dim tracking-widest uppercase mb-2">Verification</p>
-              <div className="space-y-1 text-xs">
-                <p className="text-terminal-green">
-                  {STATUS_SYMBOLS.success} Split exists on-chain
+            <div className="border-t border-white/[0.06] pt-4">
+              <p className="text-[10px] text-terminal-dim tracking-wider uppercase mb-2">Verification</p>
+              <div className="space-y-1.5 text-xs">
+                <p className="text-terminal-green flex items-center gap-2">
+                  <span>{STATUS_SYMBOLS.success}</span> Split exists on-chain
                 </p>
-                <p className="text-terminal-green">
-                  {STATUS_SYMBOLS.success} Data read from mapping: {PROGRAM_ID}/splits
+                <p className="text-terminal-green flex items-center gap-2">
+                  <span>{STATUS_SYMBOLS.success}</span> Data from mapping: {PROGRAM_ID}/splits
                 </p>
-                <p className={splitResult.status === 1 ? 'text-terminal-cyan' : 'text-terminal-amber'}>
-                  {splitResult.status === 1 ? STATUS_SYMBOLS.success : STATUS_SYMBOLS.pending}{' '}
+                <p className={`flex items-center gap-2 ${splitResult.status === 1 ? 'text-terminal-cyan' : 'text-terminal-amber'}`}>
+                  <span>{splitResult.status === 1 ? STATUS_SYMBOLS.success : STATUS_SYMBOLS.pending}</span>
                   {splitResult.status === 1 ? 'Split is settled (final)' : 'Split is active (accepting payments)'}
                 </p>
               </div>
@@ -212,14 +218,14 @@ export function Explorer() {
       {/* Transaction Result */}
       {txResult && (
         <TerminalCard title="TRANSACTION" variant="accent">
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex justify-between text-xs">
               <span className="text-terminal-dim">Transaction ID</span>
               <a
                 href={`https://testnet.explorer.provable.com/transaction/${txResult.id}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-terminal-cyan hover:underline break-all text-right max-w-[60%]"
+                className="text-terminal-cyan hover:text-terminal-green break-all text-right max-w-[60%] font-mono transition-colors"
               >
                 {txResult.id}
               </a>
@@ -241,7 +247,7 @@ export function Explorer() {
         <div className="space-y-2">
           <div className="flex justify-between text-xs">
             <span className="text-terminal-dim">Program</span>
-            <span className="text-terminal-text">{PROGRAM_ID}</span>
+            <span className="text-terminal-text font-mono">{PROGRAM_ID}</span>
           </div>
           <div className="flex justify-between text-xs">
             <span className="text-terminal-dim">Network</span>
@@ -249,7 +255,7 @@ export function Explorer() {
           </div>
           <div className="flex justify-between text-xs">
             <span className="text-terminal-dim">Mappings</span>
-            <span className="text-terminal-text">splits, split_salts</span>
+            <span className="text-terminal-text font-mono">splits, split_salts</span>
           </div>
           <div className="flex justify-between text-xs">
             <span className="text-terminal-dim">Transitions</span>
@@ -259,12 +265,12 @@ export function Explorer() {
             <span className="text-terminal-dim">Records</span>
             <span className="text-terminal-text">Split, Debt, PayerReceipt, CreatorReceipt</span>
           </div>
-          <div className="border-t border-terminal-border pt-2 mt-2">
+          <div className="border-t border-white/[0.06] pt-3 mt-3">
             <a
               href={`https://testnet.explorer.provable.com/program/${PROGRAM_ID}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-terminal-cyan hover:underline"
+              className="text-xs text-terminal-cyan hover:text-terminal-green transition-colors"
             >
               {STATUS_SYMBOLS.arrow} View on Provable Explorer
             </a>
@@ -275,11 +281,11 @@ export function Explorer() {
       {/* Privacy Info */}
       <TerminalCard title="PRIVACY MODEL">
         <div className="space-y-2 text-xs">
-          <p className="text-terminal-green">{STATUS_SYMBOLS.success} All amounts stored in encrypted records (private)</p>
-          <p className="text-terminal-green">{STATUS_SYMBOLS.success} Participant identities hidden in records</p>
-          <p className="text-terminal-green">{STATUS_SYMBOLS.success} Payments via credits.aleo/transfer_private</p>
-          <p className="text-terminal-green">{STATUS_SYMBOLS.success} Only anonymous counters visible on-chain</p>
-          <p className="text-terminal-dim mt-2">
+          <p className="text-terminal-green flex items-center gap-2"><span>{STATUS_SYMBOLS.success}</span> All amounts stored in encrypted records (private)</p>
+          <p className="text-terminal-green flex items-center gap-2"><span>{STATUS_SYMBOLS.success}</span> Participant identities hidden in records</p>
+          <p className="text-terminal-green flex items-center gap-2"><span>{STATUS_SYMBOLS.success}</span> Payments via credits.aleo/transfer_private</p>
+          <p className="text-terminal-green flex items-center gap-2"><span>{STATUS_SYMBOLS.success}</span> Only anonymous counters visible on-chain</p>
+          <p className="text-terminal-dim mt-3">
             Public mappings contain: participant count, payment count, status (0/1).
             Zero amounts, zero addresses, zero private data.
           </p>

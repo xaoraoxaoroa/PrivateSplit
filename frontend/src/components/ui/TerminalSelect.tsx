@@ -7,17 +7,17 @@ interface TerminalSelectProps extends React.SelectHTMLAttributes<HTMLSelectEleme
 
 export function TerminalSelect({ label, options, className, ...props }: TerminalSelectProps) {
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       {label && (
-        <label className="block text-terminal-dim text-xs tracking-widest uppercase">
+        <label className="block text-terminal-dim text-xs tracking-wider uppercase font-medium">
           {label}
         </label>
       )}
-      <div className="flex items-center gap-2 bg-terminal-bg border border-terminal-border focus-within:border-terminal-green transition-colors">
-        <span className="text-terminal-green pl-3 select-none">&gt;</span>
+      <div className="flex items-center gap-2 bg-white/[0.02] border border-white/[0.08] rounded-glass-sm focus-within:border-terminal-green/60 transition-colors">
+        <span className="text-terminal-green/60 pl-3 select-none font-mono text-sm">&gt;</span>
         <select
           className={cn(
-            'w-full bg-transparent py-2 pr-3 text-sm font-mono text-terminal-text',
+            'w-full bg-transparent py-2.5 pr-3 text-sm font-mono text-terminal-text',
             'outline-none appearance-none cursor-pointer',
             className,
           )}

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect } from 'react';
 import { create } from 'zustand';
 
 interface ToastItem {
@@ -26,7 +26,7 @@ export const useToastStore = create<ToastStore>()((set) => ({
     set((s) => ({ toasts: s.toasts.map((t) => (t.id === id ? { ...t, exiting: true } : t)) })),
 }));
 
-function ToastItem({ toast }: { toast: ToastItem }) {
+function ToastItemComponent({ toast }: { toast: ToastItem }) {
   const { removeToast, markExiting } = useToastStore();
 
   useEffect(() => {
@@ -37,24 +37,17 @@ function ToastItem({ toast }: { toast: ToastItem }) {
     return () => clearTimeout(timer);
   }, [toast.id, removeToast, markExiting]);
 
-  const borderColor = {
-    success: 'border-terminal-green',
-    error: 'border-terminal-red',
-    info: 'border-terminal-cyan',
-  }[toast.type];
-
-  const symbol = { success: '\u2713', error: '\u2717', info: '\u25CB' }[toast.type];
-  const textColor = {
-    success: 'text-terminal-green',
-    error: 'text-terminal-red',
-    info: 'text-terminal-cyan',
+  const config = {
+    success: { border: 'border-terminal-green/30', dot: 'bg-terminal-green', text: 'text-terminal-green' },
+    error: { border: 'border-terminal-red/30', dot: 'bg-terminal-red', text: 'text-terminal-red' },
+    info: { border: 'border-terminal-cyan/30', dot: 'bg-terminal-cyan', text: 'text-terminal-cyan' },
   }[toast.type];
 
   return (
     <div
-      className={`${toast.exiting ? 'toast-exit' : 'toast-enter'} bg-terminal-surface border ${borderColor} p-3 flex items-start gap-2 min-w-[280px] max-w-[380px]`}
+      className={`${toast.exiting ? 'toast-exit' : 'toast-enter'} glass-card ${config.border} p-3 flex items-start gap-3 min-w-[280px] max-w-[380px]`}
     >
-      <span className={`${textColor} text-xs shrink-0`}>{symbol}</span>
+      <span className={`w-2 h-2 rounded-full mt-1 shrink-0 ${config.dot}`} />
       <p className="text-xs text-terminal-text flex-1 break-words">{toast.message}</p>
       <button
         onClick={() => {
@@ -63,7 +56,7 @@ function ToastItem({ toast }: { toast: ToastItem }) {
         }}
         className="text-terminal-dim hover:text-terminal-text text-xs shrink-0"
       >
-        x
+        &times;
       </button>
     </div>
   );
@@ -75,7 +68,7 @@ export function ToastContainer() {
   return (
     <div className="fixed top-16 right-4 z-50 flex flex-col gap-2">
       {toasts.map((t) => (
-        <ToastItem key={t.id} toast={t} />
+        <ToastItemComponent key={t.id} toast={t} />
       ))}
     </div>
   );

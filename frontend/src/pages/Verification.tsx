@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useWallet } from '@provablehq/aleo-wallet-adaptor-react';
 import { TerminalCard, TerminalButton, TerminalBadge } from '../components/ui';
-import { PROGRAM_ID, TESTNET_API } from '../utils/constants';
+import { PROGRAM_ID } from '../utils/constants';
 import { getSplitStatus } from '../utils/aleo-utils';
-import { microToCredits, truncateAddress } from '../utils/format';
 import { STATUS_SYMBOLS } from '../design-system/tokens';
 import { Link } from 'react-router-dom';
 
@@ -30,14 +29,12 @@ export function Verification() {
     setVerificationResults([]);
 
     try {
-      // Fetch all program records (PayerReceipts and CreatorReceipts)
       const records = (await requestRecords(PROGRAM_ID)) as any[];
 
       const receiptRecords: any[] = [];
       for (const r of records || []) {
         if (r.spent) continue;
         const plaintext = r.plaintext || '';
-        // PayerReceipt and CreatorReceipt both contain split_id and amount
         if (plaintext.includes('split_id') && plaintext.includes('amount')) {
           receiptRecords.push(r);
         }
@@ -45,7 +42,6 @@ export function Verification() {
 
       setReceipts(receiptRecords);
 
-      // For each receipt, verify the split exists on-chain
       const results: VerificationResult[] = [];
       const checkedSplits = new Set<string>();
 
@@ -80,14 +76,15 @@ export function Verification() {
   if (!connected) {
     return (
       <div className="max-w-xl mx-auto space-y-6 animate-fade-in">
-        <h1 className="text-lg text-terminal-green tracking-wider">VERIFICATION</h1>
+        <h1 className="text-xl font-bold text-gradient">Verification</h1>
         <TerminalCard>
-          <p className="text-xs text-terminal-dim text-center py-6">
-            {STATUS_SYMBOLS.pending} Connect wallet to verify payment receipts
-          </p>
-          <Link to="/connect">
-            <TerminalButton variant="secondary" className="w-full">CONNECT WALLET</TerminalButton>
-          </Link>
+          <div className="py-8 text-center">
+            <p className="text-sm text-terminal-text mb-2">Wallet Required</p>
+            <p className="text-xs text-terminal-dim mb-4">Connect wallet to verify payment receipts</p>
+            <Link to="/connect">
+              <TerminalButton variant="secondary" className="w-full">CONNECT WALLET</TerminalButton>
+            </Link>
+          </div>
         </TerminalCard>
       </div>
     );
@@ -96,7 +93,7 @@ export function Verification() {
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-lg text-terminal-green tracking-wider">VERIFICATION</h1>
+        <h1 className="text-xl font-bold text-gradient">Verification</h1>
         <p className="text-xs text-terminal-dim mt-1">
           Prove your payments using on-chain receipt records
         </p>
@@ -104,19 +101,23 @@ export function Verification() {
 
       {/* How it works */}
       <TerminalCard title="HOW IT WORKS">
-        <div className="space-y-2 text-xs">
+        <div className="space-y-3 text-xs">
           <p className="text-terminal-text">
             When you pay a split, PrivateSplit creates encrypted receipt records:
           </p>
-          <p className="text-terminal-green">
-            {STATUS_SYMBOLS.success} <strong>PayerReceipt</strong> — Private to you. Proves you paid.
-          </p>
-          <p className="text-terminal-green">
-            {STATUS_SYMBOLS.success} <strong>CreatorReceipt</strong> — Private to the creator. Proves they received.
-          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="glass-card p-3">
+              <p className="text-terminal-green font-medium mb-1">{STATUS_SYMBOLS.success} PayerReceipt</p>
+              <p className="text-terminal-dim">Private to you. Proves you paid.</p>
+            </div>
+            <div className="glass-card p-3">
+              <p className="text-terminal-green font-medium mb-1">{STATUS_SYMBOLS.success} CreatorReceipt</p>
+              <p className="text-terminal-dim">Private to the creator. Proves they received.</p>
+            </div>
+          </div>
           <p className="text-terminal-dim mt-2">
             These records are encrypted on-chain. Only you can decrypt yours.
-            Click "Verify" to scan your wallet for receipt records and cross-check them against on-chain split data.
+            Click below to scan your wallet for receipt records.
           </p>
         </div>
       </TerminalCard>
@@ -128,12 +129,12 @@ export function Verification() {
 
       {/* Results */}
       {receipts.length > 0 && (
-        <TerminalCard title={`FOUND ${receipts.length} RECEIPT RECORD${receipts.length !== 1 ? 'S' : ''}`}>
+        <TerminalCard title={`FOUND ${receipts.length} RECEIPT${receipts.length !== 1 ? 'S' : ''}`}>
           <div className="space-y-2 text-xs">
             {receipts.map((r, i) => (
-              <div key={i} className="border border-terminal-border p-2">
-                <p className="text-terminal-green">{STATUS_SYMBOLS.success} Receipt #{i + 1}</p>
-                <p className="text-terminal-dim break-all mt-1">
+              <div key={i} className="glass-card p-3">
+                <p className="text-terminal-green font-medium">{STATUS_SYMBOLS.success} Receipt #{i + 1}</p>
+                <p className="text-terminal-dim break-all mt-1 font-mono">
                   {r.plaintext?.slice(0, 120) || 'Encrypted record'}...
                 </p>
               </div>
@@ -146,15 +147,15 @@ export function Verification() {
         <TerminalCard title="ON-CHAIN VERIFICATION">
           <div className="space-y-3">
             {verificationResults.map((result, i) => (
-              <div key={i} className="border border-terminal-border p-3 space-y-2">
+              <div key={i} className="glass-card p-4 space-y-3">
                 <div className="flex justify-between items-center">
-                  <p className="text-xs text-terminal-text">
+                  <p className="text-xs text-terminal-text font-mono">
                     Split: {result.splitId.slice(0, 20)}...
                   </p>
                   <TerminalBadge status={result.status === 1 ? 'settled' : 'active'} />
                 </div>
 
-                <div className="space-y-1 text-xs">
+                <div className="space-y-1.5 text-xs">
                   <p className={result.onChain ? 'text-terminal-green' : 'text-terminal-red'}>
                     {result.onChain ? STATUS_SYMBOLS.success : STATUS_SYMBOLS.error}{' '}
                     {result.onChain ? 'Split verified on-chain' : 'Split NOT found on-chain'}
@@ -181,7 +182,7 @@ export function Verification() {
 
       {!loading && receipts.length === 0 && verificationResults.length === 0 && (
         <TerminalCard>
-          <p className="text-xs text-terminal-dim text-center py-4">
+          <p className="text-xs text-terminal-dim text-center py-6">
             {STATUS_SYMBOLS.pending} Click "Scan Wallet" to check for payment receipts
           </p>
         </TerminalCard>

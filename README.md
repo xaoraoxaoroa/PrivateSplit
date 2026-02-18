@@ -17,7 +17,7 @@ Splitwise stores every expense, every amount, and every participant on their ser
 
 ---
 
-## Why PrivateSplit Has Stronger Privacy Than Other Payment Apps on Aleo
+## Why PrivateSplit Has Stronger Privacy Than Any Other Payment App on Aleo
 
 Most ZK payment systems still leak financial data because they use public inputs in transitions. Here is a concrete comparison:
 
@@ -109,7 +109,7 @@ Creator                              Participant
    │    → Debt record ──────────────────►│
    │       (NO ON-CHAIN TRACE)           │
    │                                     │
-   │  Share payment link                 │
+   │  Share payment link / QR code       │
    │  ──────────────────────────────────►│
    │                                     ├─ pay_debt(debt, credits)
    │                                     │    → transfer_private(to creator)
@@ -126,31 +126,39 @@ Creator                              Participant
 
 ### New in Wave 2 (Feb 11–25, 2026)
 
-**Smart Contract (New)**
+**Smart Contract**
 - Deployed `private_split_v1.aleo` on Aleo Testnet
-- `issue_debt` transition with NO finalize block — zero on-chain trace of debt issuance
+- `issue_debt` transition with NO finalize block — zero on-chain trace
 - 4 record types with zero amounts in public mappings
 - Cryptographic settlement: only record owner can settle (protocol-enforced)
-- Confirmed on-chain transaction: `at1ue3v4t5u9rsmf7h7jnee8dhr6dguda59lrct68j3d4rjhm395vqqhjwcxv`
+- Confirmed on-chain TX: `at1ue3v4t5u9rsmf7h7jnee8dhr6dguda59lrct68j3d4rjhm395vqqhjwcxv`
 
 **Shield Wallet Integration (Wave 2 Mandatory)**
 - Full Shield Wallet support via `@provablehq/aleo-wallet-adaptor-react`
 - Real `credits.aleo/transfer_private` payments (not mocked)
 - 4-strategy split_id retrieval after transaction finalization
-- Robust record matching using structured field parsing (not fragile substring search)
+- Robust record matching using structured field parsing
 
 **Privacy Architecture**
-- Cryptographically secure salt generation via `crypto.getRandomValues()` (not `Math.random()`)
-- Backend encrypts all sensitive fields (addresses AND amounts) with AES-256-GCM
+- Cryptographically secure salt via `crypto.getRandomValues()` (not `Math.random()`)
+- Backend encrypts all sensitive fields (addresses + amounts) with AES-256-GCM
 - COOP/COEP headers for WASM isolation (required for Aleo SDK)
 - Zero private data in any finalize scope
 
-**Frontend (New)**
-- Terminal UI aesthetic (unique — JetBrains Mono, sharp borders, no blur effects)
-- 8 functional pages: Dashboard, Create, Pay, Split Detail, Explorer, Verification, History, Connect
-- Real-time transaction log on every page
-- Payment link sharing with encoded parameters
-- On-chain explorer with split ID lookup
+**Frontend — Glassmorphic Design System (Wave 2 Overhaul)**
+- Full UI redesign: glassmorphic dark fintech aesthetic with Inter + JetBrains Mono typography
+- Glassmorphic cards: subtle transparency, border-radius, backdrop blur, soft glows
+- Modern color palette: emerald green (#34d399), cyan (#22d3ee), purple (#a78bfa), amber (#fbbf24)
+- 9 functional pages: Dashboard, Create, Pay, Split Detail, History, Explorer, Verification, Privacy, Connect
+- Status badges with animated pulse indicators (active/settled/pending)
+- Progress bars on split cards and explorer results
+- QR code generation for payment link sharing
+- Ambient background gradients and staggered page animations
+- On-chain explorer with split ID, salt, and TX hash lookup
+- Receipt verification: scan wallet for PayerReceipt/CreatorReceipt, cross-check on-chain
+- Privacy comparison table (vs Splitwise, Venmo, other ZK apps)
+- Complete data flow diagram showing the full lifecycle
+- Responsive mobile layout with slide-out navigation
 
 **Backend**
 - Node.js + Express + Supabase
@@ -167,12 +175,20 @@ Creator                              Participant
 
 ### Step-by-Step
 
-1. **Connect**: Visit https://privatesplit.vercel.app → `/connect` → Connect Shield Wallet
-2. **Create**: Go to `/create` → Enter description, total amount, number of participants + their addresses
-3. **Issue Debts**: On the split detail page → click "ISSUE DEBT" for each participant
-4. **Pay**: Participants follow the payment link → `/pay?...` → click "EXECUTE PAYMENT"
-5. **Verify**: Visit `/explorer` → paste split ID → see on-chain status
-6. **Settle**: Creator clicks "SETTLE SPLIT" when all payments received
+1. **Connect**: Visit https://privatesplit.vercel.app → Connect Shield Wallet
+2. **Create**: Go to Create → Enter description, total amount, participant count + addresses
+3. **Issue Debts**: On the split detail page → click "ISSUE" for each participant
+4. **Share**: Copy the payment link or scan the QR code
+5. **Pay**: Participants follow the payment link → click "EXECUTE PAYMENT"
+6. **Verify**: Visit Explorer → paste split ID → see on-chain status (or use Verification page)
+7. **Settle**: Creator clicks "SETTLE SPLIT" when all payments received
+
+### Pre-Populated Test Data
+
+The Explorer page includes quick-lookup buttons with confirmed on-chain data:
+- **Split ID**: `1904758949858929157912240259749859140762221531679669196161601694830550064831field`
+- **Salt**: `987654321098765field`
+- **TX Hash**: `at1ue3v4t5u9rsmf7h7jnee8dhr6dguda59lrct68j3d4rjhm395vqqhjwcxv`
 
 ### Test with CLI (Advanced)
 
@@ -180,7 +196,7 @@ Creator                              Participant
 # Verify split on-chain
 curl https://api.provable.com/v2/testnet/program/private_split_v1.aleo/mapping/splits/{split_id}
 
-# View confirmed transactions
+# View program on explorer
 # https://testnet.explorer.provable.com/program/private_split_v1.aleo
 ```
 
@@ -189,21 +205,21 @@ curl https://api.provable.com/v2/testnet/program/private_split_v1.aleo/mapping/s
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  FRONTEND  (React 18 + TypeScript + Vite + Tailwind)    │
-│  Live: privatesplit.vercel.app                           │
-│  Shield Wallet via @provablehq/aleo-wallet-adaptor-react │
-│  Terminal UI: JetBrains Mono, #0a0a0a bg, #00ff88 green  │
-├─────────────────────────────────────────────────────────┤
-│  LEO SMART CONTRACT  (private_split_v1.aleo)            │
-│  Aleo Testnet — 5 transitions, 4 records, 2 mappings    │
-│  Zero amounts in mappings · Zero private data in finalize│
-│  issue_debt: NO finalize (100% private operation)        │
-├─────────────────────────────────────────────────────────┤
-│  BACKEND  (Node.js + Express + Supabase)                │
-│  AES-256-GCM encrypted: addresses + amounts             │
-│  REST API for cross-device split recovery               │
-└─────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────┐
+│  FRONTEND  (React 18 + TypeScript + Vite + Tailwind)      │
+│  Live: privatesplit.vercel.app                             │
+│  Shield Wallet via @provablehq/aleo-wallet-adaptor-react   │
+│  Glassmorphic UI: Inter + JetBrains Mono, dark theme       │
+├───────────────────────────────────────────────────────────┤
+│  LEO SMART CONTRACT  (private_split_v1.aleo)              │
+│  Aleo Testnet — 5 transitions, 4 records, 2 mappings      │
+│  Zero amounts in mappings · Zero private data in finalize  │
+│  issue_debt: NO finalize (100% private operation)          │
+├───────────────────────────────────────────────────────────┤
+│  BACKEND  (Node.js + Express + Supabase)                  │
+│  AES-256-GCM encrypted: addresses + amounts               │
+│  REST API for cross-device split recovery                 │
+└───────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -215,9 +231,10 @@ curl https://api.provable.com/v2/testnet/program/private_split_v1.aleo/mapping/s
 | Smart Contract | Leo (Aleo) |
 | Blockchain | Aleo Testnet |
 | Frontend | React 18 + TypeScript + Vite |
-| Styling | Tailwind CSS (terminal aesthetic) |
+| Styling | Tailwind CSS (glassmorphic dark theme) |
+| Typography | Inter (UI) + JetBrains Mono (data) |
 | State | Zustand + localStorage |
-| Wallet | Shield Wallet (primary) |
+| Wallet | Shield Wallet (primary), Leo, Puzzle, Fox, Soter |
 | Backend | Node.js + Express |
 | Database | Supabase (PostgreSQL) |
 | Encryption | AES-256-GCM |
@@ -233,6 +250,18 @@ curl https://api.provable.com/v2/testnet/program/private_split_v1.aleo/mapping/s
 - Cryptographically secure random salt: `crypto.getRandomValues(new Uint8Array(16))`
 - AES-256-GCM with random IVs for all off-chain encrypted data
 - COOP/COEP headers prevent cross-origin data leaks
+
+---
+
+## What's Next (Wave 3+)
+
+- USDCx stablecoin support (dual payment method: credits + USDCx)
+- Multi-token payment options
+- Group expense templates (recurring splits)
+- Treasury management for organizations
+- Mobile app (React Native / Expo)
+- Full on-chain transaction history viewer
+- Enhanced receipt export and dispute resolution
 
 ---
 

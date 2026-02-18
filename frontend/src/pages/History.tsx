@@ -3,7 +3,6 @@ import { useWallet } from '@provablehq/aleo-wallet-adaptor-react';
 import { TerminalCard, TerminalButton } from '../components/ui';
 import { SplitCard } from '../components/split/SplitCard';
 import { useSplitStore } from '../store/splitStore';
-import { STATUS_SYMBOLS } from '../design-system/tokens';
 import { Link } from 'react-router-dom';
 
 type Filter = 'all' | 'active' | 'settled';
@@ -19,14 +18,15 @@ export function History() {
   if (!connected) {
     return (
       <div className="max-w-xl mx-auto space-y-6 animate-fade-in">
-        <h1 className="text-lg text-terminal-green tracking-wider">HISTORY</h1>
+        <h1 className="text-xl font-bold text-gradient">My Splits</h1>
         <TerminalCard>
-          <p className="text-xs text-terminal-dim text-center py-6">
-            {STATUS_SYMBOLS.pending} Connect wallet to view history
-          </p>
-          <Link to="/connect">
-            <TerminalButton variant="secondary" className="w-full">CONNECT WALLET</TerminalButton>
-          </Link>
+          <div className="py-8 text-center">
+            <p className="text-sm text-terminal-text mb-2">Wallet Required</p>
+            <p className="text-xs text-terminal-dim mb-4">Connect wallet to view your split history</p>
+            <Link to="/connect">
+              <TerminalButton variant="secondary" className="w-full">CONNECT WALLET</TerminalButton>
+            </Link>
+          </div>
         </TerminalCard>
       </div>
     );
@@ -35,19 +35,22 @@ export function History() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg text-terminal-green tracking-wider">HISTORY</h1>
-        <div className="flex items-center gap-1">
+        <div>
+          <h1 className="text-xl font-bold text-gradient">My Splits</h1>
+          <p className="text-xs text-terminal-dim mt-1">{mySplits.length} total splits</p>
+        </div>
+        <div className="flex items-center gap-1.5">
           {(['all', 'active', 'settled'] as Filter[]).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-3 py-1 text-xs tracking-wider border transition-colors ${
+              className={`px-3 py-1.5 text-xs font-medium tracking-wide rounded-lg border transition-colors ${
                 filter === f
-                  ? 'border-terminal-green text-terminal-green'
-                  : 'border-terminal-border text-terminal-dim hover:text-terminal-text'
+                  ? 'border-terminal-green/40 text-terminal-green bg-terminal-green/10'
+                  : 'border-white/[0.06] text-terminal-dim hover:text-terminal-text hover:bg-white/[0.03]'
               }`}
             >
-              {f.toUpperCase()}
+              {f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
           ))}
         </div>
@@ -55,12 +58,17 @@ export function History() {
 
       {filtered.length === 0 ? (
         <TerminalCard>
-          <p className="text-xs text-terminal-dim text-center py-6">
-            {STATUS_SYMBOLS.pending} No {filter === 'all' ? '' : filter + ' '}splits found
-          </p>
-          <Link to="/create">
-            <TerminalButton variant="secondary" className="w-full">CREATE A SPLIT</TerminalButton>
-          </Link>
+          <div className="py-8 text-center">
+            <p className="text-sm text-terminal-text mb-2">
+              No {filter === 'all' ? '' : filter + ' '}splits found
+            </p>
+            <p className="text-xs text-terminal-dim mb-4">
+              Create your first split to get started.
+            </p>
+            <Link to="/create">
+              <TerminalButton variant="secondary" className="w-full">CREATE A SPLIT</TerminalButton>
+            </Link>
+          </div>
         </TerminalCard>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

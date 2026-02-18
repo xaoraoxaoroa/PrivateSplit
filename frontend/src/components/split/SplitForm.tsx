@@ -31,7 +31,6 @@ export function SplitForm({ onSubmit, loading }: SplitFormProps) {
     const updated = [...participants];
     updated[index] = value;
     setParticipants(updated);
-    // Clear error on change
     const newErrors = { ...errors };
     delete newErrors[`participant_${index}`];
     setErrors(newErrors);
@@ -93,18 +92,20 @@ export function SplitForm({ onSubmit, loading }: SplitFormProps) {
   return (
     <form onSubmit={handleSubmit}>
       <TerminalCard title="NEW SPLIT">
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div>
             <TerminalInput
               label="Description"
-              placeholder="dinner, groceries, rent..."
+              placeholder="Dinner, groceries, rent..."
               value={description}
               onChange={(e) => { setDescription(e.target.value); setErrors((p) => ({ ...p, description: '' })); }}
               error={errors.description}
               required
             />
             {!errors.description && description.trim().length >= 3 && (
-              <p className="text-terminal-green text-[10px] mt-1">{STATUS_SYMBOLS.success} Valid</p>
+              <p className="text-terminal-green text-[10px] mt-1 flex items-center gap-1">
+                <span>{STATUS_SYMBOLS.success}</span> Valid
+              </p>
             )}
           </div>
 
@@ -121,7 +122,9 @@ export function SplitForm({ onSubmit, loading }: SplitFormProps) {
               required
             />
             {!errors.amount && parseFloat(amount) > 0 && (
-              <p className="text-terminal-green text-[10px] mt-1">{STATUS_SYMBOLS.success} Valid</p>
+              <p className="text-terminal-green text-[10px] mt-1 flex items-center gap-1">
+                <span>{STATUS_SYMBOLS.success}</span> Valid
+              </p>
             )}
           </div>
 
@@ -133,16 +136,16 @@ export function SplitForm({ onSubmit, loading }: SplitFormProps) {
           />
 
           {amount && participantCount > 0 && (
-            <div className="text-xs text-terminal-dim border-t border-terminal-border pt-3">
-              {STATUS_SYMBOLS.arrow} Each person pays:{' '}
-              <span className="text-terminal-green font-bold">
+            <div className="glass-card p-3 text-xs text-terminal-dim">
+              <span className="text-terminal-green">{STATUS_SYMBOLS.arrow}</span> Each person pays:{' '}
+              <span className="text-terminal-green font-semibold font-mono">
                 {(parseFloat(amount || '0') / participantCount).toFixed(6)} credits
               </span>
             </div>
           )}
 
-          <div className="space-y-2 border-t border-terminal-border pt-3">
-            <p className="text-[10px] text-terminal-dim tracking-widest uppercase">Participant Addresses</p>
+          <div className="space-y-3 border-t border-white/[0.06] pt-4">
+            <p className="text-[10px] text-terminal-dim tracking-wider uppercase font-medium">Participant Addresses</p>
             {errors.participants && (
               <p className="text-terminal-red text-[10px]">{STATUS_SYMBOLS.error} {errors.participants}</p>
             )}
@@ -155,7 +158,9 @@ export function SplitForm({ onSubmit, loading }: SplitFormProps) {
                   error={errors[`participant_${i}`]}
                 />
                 {!errors[`participant_${i}`] && addr && ALEO_ADDRESS_REGEX.test(addr) && addr !== address && (
-                  <p className="text-terminal-green text-[10px] mt-1">{STATUS_SYMBOLS.success} Valid address</p>
+                  <p className="text-terminal-green text-[10px] mt-1 flex items-center gap-1">
+                    <span>{STATUS_SYMBOLS.success}</span> Valid address
+                  </p>
                 )}
               </div>
             ))}

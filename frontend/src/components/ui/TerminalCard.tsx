@@ -9,24 +9,24 @@ interface TerminalCardProps {
 }
 
 export function TerminalCard({ children, title, className, variant = 'default', hoverable = false }: TerminalCardProps) {
-  const styles = {
-    default: 'border-terminal-border',
-    accent: 'border-terminal-green/40 glow-green',
-    error: 'border-terminal-red/60',
-    stat: 'border-terminal-border glow-top',
+  const variantStyles = {
+    default: 'glass-card',
+    accent: 'glass-card glass-card-accent',
+    error: 'glass-card glass-card-error',
+    stat: 'glass-card glass-card-stat',
   }[variant];
 
   return (
     <div
       className={cn(
-        'bg-terminal-surface border p-4',
-        styles,
-        hoverable && 'card-hover cursor-pointer',
+        variantStyles,
+        'p-5',
+        hoverable && 'glass-card-hover cursor-pointer',
         className,
       )}
     >
       {title && (
-        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-terminal-border">
+        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-white/[0.06]">
           <span className="text-terminal-dim text-[10px] tracking-[0.2em] uppercase font-medium">{title}</span>
         </div>
       )}
