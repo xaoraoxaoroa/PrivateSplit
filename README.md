@@ -1,135 +1,131 @@
-# PrivateSplit — Privacy-First Expense Splitting on Aleo
+# PrivateSplit - Privacy-First Expense Splitting on Aleo
 
-> Split expenses with friends. Nobody sees who owes what. Built on Aleo's zero-knowledge blockchain.
+> Split expenses with friends without revealing who owes what.
 
-## What is PrivateSplit?
+PrivateSplit is a privacy-preserving expense splitting protocol built on Aleo. Unlike Splitwise where the server sees every amount and participant, PrivateSplit keeps all financial details encrypted on-chain using zero-knowledge proofs.
 
-PrivateSplit is the first privacy-preserving expense splitting protocol on Aleo. Think Splitwise, but with cryptographic privacy guarantees: amounts, participants, and payment details are encrypted in Aleo records. Only anonymous counters (how many paid, how many participants) are visible on-chain.
+**Smart Contract:** private_split_v1.aleo on Aleo Testnet
+**Built for:** Aleo Privacy Buildathon by AKINDO - Wave 2
+
+---
+
+## Why Privacy Matters for Expense Splitting
+
+Traditional splitting apps create permanent readable records of how much you owe, who you spend time with, and your financial patterns. PrivateSplit eliminates this by keeping all amounts, participants, and settlement details encrypted in Aleo records. The only public information is anonymous metadata: a split exists, how many people are involved, and how many have paid - with zero amounts and zero addresses.
+
+---
 
 ## Privacy Model
 
-| Data | Storage | Visibility |
-|------|---------|-----------|
-| Split amounts | Records (encrypted) | Only creator |
-| Who owes whom | Debt records (encrypted) | Only debtor + creator |
-| Payment details | Receipt records (encrypted) | Only payer + creator |
-| Payment amounts | Never on-chain in plaintext | Private |
-| Participant count | Mapping (public) | Anyone |
-| Payment count | Mapping (public) | Anyone |
-| Split status | Mapping (public) | Anyone |
+| Data | Where Stored | Visibility |
+|------|-------------|------------|
+| Creator identity | Split record (encrypted) | Private - only creator |
+| Total amount | Split record (encrypted) | Private - only creator |
+| Per-person share | Split + Debt records | Private - only involved parties |
+| Who owes whom | Debt record (encrypted) | Private - only debtor + creditor |
+| Payment amounts | Receipt records | Private - only payer + creditor |
+| Payment identity | credits.aleo/transfer_private | Private - hidden by protocol |
+| Split exists | splits mapping | Public (anonymous counter) |
+| Participant count | splits mapping | Public (just a number) |
+| Payment count | splits mapping | Public (just a number) |
+| Settlement status | splits mapping | Public (0=active 1=settled) |
 
-**Zero amounts, zero addresses in public mappings.** Only anonymous counters.
+**Key principle:** Private data in records (encrypted). Public mappings = only anonymous counters.
 
-## Architecture
+---
 
-```
-┌─────────────────────────────────────────────────┐
-│  FRONTEND (React 18 + Vite + Terminal UI)       │
-│  - Shield Wallet integration                    │
-│  - Zustand state + localStorage persist         │
-│  - Terminal aesthetic (JetBrains Mono)           │
-├─────────────────────────────────────────────────┤
-│  LEO SMART CONTRACT (private_split_v1.aleo)     │
-│  - 4 record types (Split, Debt, receipts)       │
-│  - 2 mappings (minimal public metadata)         │
-│  - 5 transitions (create, issue, pay, settle)   │
-│  - imports credits.aleo for real payments       │
-├─────────────────────────────────────────────────┤
-│  BACKEND (Node.js + Express + Supabase)         │
-│  - AES-256-GCM encrypted storage                │
-│  - REST API for split indexing                   │
-└─────────────────────────────────────────────────┘
-```
+## Smart Contract - 5 Transitions
 
-## Smart Contract: `private_split_v1.aleo`
+| # | Function | Async | Description |
+|---|----------|-------|-------------|
+| 1 | create_split(total, count, salt) | Yes | Creates Split record + metadata on-chain |
+| 2 | issue_debt(split_record, participant) | **No** | 100% private. No finalize. |
+| 3 | pay_debt(debt_record, credits_record) | Yes | Pays via credits.aleo/transfer_private |
+| 4 | settle_split(split_record) | Yes | Creator closes split |
+| 5 | verify_split(split_id) | Yes | Public status query |
 
-### Records (all private)
-- **Split** — Creator's record with total amount, per-person share, participant count
-- **Debt** — Issued to each participant, contains amount owed and creditor address
-- **PayerReceipt** — Proof of payment for the payer
-- **CreatorReceipt** — Proof of receipt for the creator
+4 Record Types: Split, Debt, PayerReceipt, CreatorReceipt
+2 Mappings: splits (anonymous counters), split_salts (lookup)
 
-### Transitions
-1. `create_split(total, count, salt)` — Create a new expense split
-2. `issue_debt(split_record, participant)` — Issue debt to a participant
-3. `pay_debt(debt_record, credits_record)` — Pay via `credits.aleo/transfer_private`
-4. `settle_split(split_record)` — Creator settles the split
-5. `verify_split(split_id)` — Public status query
+issue_debt has NO finalize - issuing debts reveals nothing on-chain.
 
-### Mappings (minimal public data)
-- `splits: field => SplitMeta` — Only stores {participant_count, payment_count, status}
-- `split_salts: field => field` — Maps salt to split_id for lookup
+---
 
-## How to Test
+## User Flow
 
-### Prerequisites
-- [Shield Wallet](https://shieldwallet.xyz) browser extension
-- Aleo Testnet credits (get from faucet)
+1. Creator connects Shield Wallet and creates a split (amount, participants)
+2. Creator issues debts to each participant (100% private)
+3. Participants receive Debt records, pay via payment link
+4. Payment uses credits.aleo/transfer_private (payer hidden)
+5. Both parties get encrypted receipt records
+6. Creator settles when all payments received
 
-### Run Locally
-```bash
-# Frontend
-cd frontend
-npm install
-npm run dev
-# Opens at http://localhost:5173
-
-# Backend
-cd backend
-cp .env.example .env
-# Fill in Supabase credentials
-npm install
-npm run dev
-# API at http://localhost:3001
-```
-
-### End-to-End Flow
-1. Connect Shield Wallet on `/connect`
-2. Create a split on `/create` (description, amount, participants)
-3. Share the payment link with participants
-4. Participants open link and pay with one click
-5. Creator settles when all payments received
+---
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Smart Contract | Leo (Aleo) |
-| Blockchain | Aleo Testnet |
-| Hashing | BHP256 |
+| Smart Contracts | Leo (Aleo) |
 | Frontend | React 18 + TypeScript + Vite |
 | Styling | Tailwind CSS |
-| Wallet | Shield Wallet (via @provablehq adapters) |
 | State | Zustand + localStorage |
-| Backend | Node.js + Express |
-| Database | Supabase (PostgreSQL) |
-| Encryption | AES-256-GCM (off-chain) |
+| Wallet | Shield Wallet (primary) |
+| Backend | Node.js + Express + Supabase |
+| Encryption | AES-256-GCM |
+| Deployment | Vercel |
 
-## Live Demo
+---
 
-- **Frontend:** [https://frontend-ten-ochre-37.vercel.app](https://frontend-ten-ochre-37.vercel.app)
-- **Contract:** `private_split_v1.aleo` on Aleo Testnet
-- **Explorer:** [View on Provable Explorer](https://testnet.explorer.provable.com/program/private_split_v1.aleo)
+## How to Test
+
+1. Install Shield Wallet extension
+2. Get Aleo Testnet credits from faucet
+3. Visit live demo URL
+4. Connect wallet on /connect page
+5. Create split on /create (description, amount, participants)
+6. Issue debts from split detail page
+7. Participants pay via payment link
+8. Creator settles when done
+
+---
+
+## Privacy vs Competition
+
+| Feature | Splitwise | Venmo | PrivateSplit |
+|---------|-----------|-------|-------------|
+| Server sees amounts | Yes | Yes | **No** |
+| Server sees participants | Yes | Yes | **No** |
+| Social graph exposed | Yes | Yes | **No** |
+| Cryptographic receipts | No | No | **Yes** |
+| Verifiable settlement | No | No | **Yes** |
+| Self-custody | No | No | **Yes** |
+
+---
 
 ## Wave 2 Progress
 
-- [x] Leo smart contract with 4 record types and 5 transitions
-- [x] Terminal-aesthetic frontend with Shield Wallet integration
-- [x] Zero private data in public mappings (pure privacy)
-- [x] Real `credits.aleo/transfer_private` for payments
-- [x] Backend with AES-256-GCM encrypted storage
-- [x] Payment link sharing for one-click payments
-- [x] On-chain Explorer page (lookup by split_id, salt, or TX hash)
-- [x] Receipt Verification page (scan wallet for proof-of-payment records)
-- [x] Issue Debt functionality (creator issues on-chain debts to participants)
-- [x] 4-strategy split ID retrieval (matching NullPay's proven pattern)
-- [x] Wallet adapter transaction status polling
-- [x] Immutable deployment with @noupgrade constructor
-- [x] Contract test suite (6 test transitions)
-- [x] Database schema with RLS policies
-- [ ] Deploy contract to testnet
-- [ ] Execute test transactions
-- [ ] Record video demo
+- Full Leo contract with 5 transitions and 4 record types
+- Shield Wallet integration (Wave 2 mandatory)
+- Real credits.aleo/transfer_private payments
+- Terminal UI with unique design aesthetic
+- Backend with AES-256-GCM encrypted indexing
+- 4-strategy split ID retrieval
+- Payment link sharing flow
+- On-chain verification page
+
+---
+
+## Security
+
+- Record ownership enforced by Aleo protocol
+- Nullifiers handled automatically (no double-spending)
+- No private data in finalize blocks
+- 128-bit random salt per split
+- AES-256-GCM off-chain encryption
+- COOP/COEP headers for WASM isolation
+
+---
 
 ## License
 
