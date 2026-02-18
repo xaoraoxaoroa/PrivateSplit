@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+.DS_Store
+.vite/
+.vercel/
+aleo-reference-projects/
+contracts/private_split/build/
+contracts/private_split/outputs/

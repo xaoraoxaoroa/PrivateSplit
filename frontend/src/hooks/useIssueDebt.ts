@@ -1,0 +1,132 @@
+import { useState, useCallback } from 'react';
+import { useWallet } from '@provablehq/aleo-wallet-adaptor-react';
+import { PROGRAM_ID } from '../utils/constants';
+import { pollTransaction } from '../utils/aleo-utils';
+import { useSplitStore, useUIStore } from '../store/splitStore';
+
+export function useIssueDebt() {
+  const { address, executeTransaction, requestRecords, wallet } = useWallet();
+  const updateSplit = useSplitStore((s) => s.updateSplit);
+  const addLog = useUIStore((s) => s.addLog);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const issueDebt = useCallback(async (splitId: string, participant: string) => {
+    if (!address || !executeTransaction || !requestRecords) {
+      setError('Wallet not connected');
+      return false;
+    }
+
+    setLoading(true);
+    setError(null);
+    addLog(`Issuing debt to ${participant.slice(0, 12)}...`, 'system');
+
+    try {
+      // Find the Split record for this splitId
+      addLog('Requesting Split records from wallet...', 'system');
+      let splitRecordInput: string | null = null;
+
+      try {
+        const records = (await requestRecords(PROGRAM_ID)) as any[];
+        addLog(`Found ${records?.length || 0} program records`, 'info');
+
+        for (const r of records || []) {
+          if (r.spent) continue;
+
+          const plaintext = r.plaintext || '';
+          // Match split_id in the record plaintext
+          if (plaintext.includes(splitId) || r.data?.split_id === splitId) {
+            // Verify this is a Split record (has participant_count field)
+            if (plaintext.includes('participant_count') || r.data?.participant_count) {
+              splitRecordInput = r.plaintext || r.ciphertext;
+              addLog('Found matching Split record', 'success');
+              break;
+            }
+          }
+        }
+      } catch (err: any) {
+        addLog(`Record fetch: ${err.message}`, 'warning');
+      }
+
+      if (!splitRecordInput) {
+        setError('Split record not found in wallet. The wallet may need to sync.');
+        addLog('Split record not found — wallet may need to sync', 'error');
+        setLoading(false);
+        return false;
+      }
+
+      // issue_debt is a pure private transition (no async/finalize)
+      // Inputs: Split record, participant address
+      const inputs = [splitRecordInput, participant];
+
+      addLog('Executing issue_debt transaction...', 'system');
+
+      const txResult = await executeTransaction({
+        program: PROGRAM_ID,
+        function: 'issue_debt',
+        inputs,
+        fee: 0.3,
+      });
+
+      const txId = txResult?.transactionId;
+      addLog(`Issue debt transaction submitted: ${txId}`, 'success');
+
+      if (txId) {
+        let confirmed = false;
+
+        if (wallet?.adapter?.transactionStatus) {
+          let attempts = 0;
+          while (!confirmed && attempts < 120) {
+            attempts++;
+            await new Promise((r) => setTimeout(r, 1000));
+            try {
+              const statusRes: any = await wallet.adapter.transactionStatus(txId);
+              const statusStr = (typeof statusRes === 'string'
+                ? statusRes
+                : statusRes?.status || ''
+              ).toLowerCase();
+
+              if (statusStr === 'completed' || statusStr === 'finalized' || statusStr === 'accepted') {
+                confirmed = true;
+              } else if (statusStr === 'failed' || statusStr === 'rejected') {
+                throw new Error('Issue debt transaction rejected');
+              }
+
+              if (attempts % 15 === 0) {
+                addLog(`Polling... attempt ${attempts}/120`, 'info');
+              }
+            } catch (pollErr: any) {
+              if (pollErr?.message?.includes('rejected')) throw pollErr;
+            }
+          }
+        } else {
+          confirmed = await pollTransaction(txId, (msg) => addLog(msg, 'info'));
+        }
+
+        if (confirmed) {
+          addLog(`Debt issued to ${participant.slice(0, 12)}...!`, 'success');
+          // Update local state — increment issued count
+          const store = useSplitStore.getState();
+          const split = store.getSplit(splitId);
+          if (split) {
+            updateSplit(splitId, { issued_count: (split.issued_count || 0) + 1 });
+          }
+          return true;
+        } else {
+          addLog('Polling timed out. Check explorer.', 'warning');
+          return true; // TX was submitted, may still confirm
+        }
+      }
+      return false;
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to issue debt';
+      setError(msg);
+      addLog(`Error: ${msg}`, 'error');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [address, executeTransaction, requestRecords, wallet, updateSplit, addLog]);
+
+  return { issueDebt, loading, error };
+}

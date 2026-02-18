@@ -1,0 +1,10 @@
+export const PROGRAM_ID = 'private_split_v1.aleo';
+export const CREDITS_PROGRAM = 'credits.aleo';
+export const ALEO_API = 'https://api.provable.com/v2';
+export const TESTNET_API = 'https://api.provable.com/v2/testnet';
+export const MICROCREDITS_PER_CREDIT = 1_000_000;
+export const MAX_PARTICIPANTS = 8;
+export const MIN_PARTICIPANTS = 2;
+export const POLL_INTERVAL = 1000;
+export const POLL_MAX_ATTEMPTS = 120;
+export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
