@@ -35,6 +35,12 @@ export function useIssueDebt() {
       const candidates: { input: any; program: string }[] = [];
 
       for (const programId of programsToCheck) {
+        // Skip v1 if we already have v2 candidates (v2 is preferred)
+        if (programId === PROGRAM_ID_V1 && candidates.length > 0) {
+          addLog(`Skipping ${PROGRAM_ID_V1} — using v2 candidates`, 'info');
+          break;
+        }
+
         try {
           const records = (await requestRecords(programId)) as any[];
           addLog(`Found ${records?.length || 0} records from ${programId}`, 'info');
@@ -56,10 +62,9 @@ export function useIssueDebt() {
               break;
             }
             if (isSplit) {
-              candidates.unshift({ input: recordInput, program: programId });
+              candidates.push({ input: recordInput, program: programId });
               addLog(`Found Split record candidate (${programId})`, 'info');
             } else {
-              // Can't identify — still a candidate (wallet will validate type)
               candidates.push({ input: recordInput, program: programId });
             }
           }
