@@ -1,11 +1,11 @@
-# PrivateSplit — The Only Private Expense Splitter on Aleo
+# PrivateSplit — Private Expense Splitting on Aleo
 
 > Split expenses with friends without revealing who owes what, how much, or who paid.
 
 **Live Demo:** https://privatesplit.vercel.app
 **Contract:** `private_split_v2.aleo` on Aleo Testnet (v1 also deployed)
 **Built for:** Aleo Privacy Buildathon by AKINDO — Wave 2
-**GitHub:** https://github.com/xaoraoxaoroa/PrivateSplit
+**GitHub:** https://github.com/Pratiikpy/PrivateSplit
 
 ---
 
@@ -13,11 +13,11 @@
 
 Splitwise stores every expense, every amount, and every participant on their servers. Venmo publishes your payment activity by default. Every time you split a dinner or a trip with friends, a corporation learns your financial relationships, spending habits, and social graph.
 
-**PrivateSplit eliminates this.** Every amount, every participant, every debt — encrypted on-chain using zero-knowledge proofs. The only public information is an anonymous counter: "a split exists, N people were involved, M have paid."
+**PrivateSplit keeps this data private.** Every amount, every participant, every debt — encrypted on-chain using zero-knowledge proofs. The only public information is an anonymous counter: "a split exists, N people were involved, M have paid."
 
 ---
 
-## Why PrivateSplit Has Stronger Privacy Than Any Other Payment App on Aleo
+## Privacy Comparison
 
 Most ZK payment systems still leak financial data because they use public inputs in transitions. Here is a concrete comparison:
 
@@ -30,7 +30,7 @@ Most ZK payment systems still leak financial data because they use public inputs
 | Payment metadata | Server | Public | **Public field** | **Not supported (by design)** |
 | Settlement event | Server | N/A | Hash visible | Anonymous counter only |
 
-### The Nuclear Privacy Advantage: `issue_debt` Has No Finalize
+### Key Architecture Decision: `issue_debt` Has No Finalize
 
 In PrivateSplit, when a creator issues a debt to a participant, **there is literally zero on-chain record that this happened**. The `issue_debt` transition has no `finalize` block. This means:
 
@@ -41,7 +41,7 @@ In PrivateSplit, when a creator issues a debt to a participant, **there is liter
 
 The participant's encrypted Debt record appears in their wallet. That is it. No blockchain explorer can determine who owes what to whom.
 
-This is architecturally impossible with hash-based invoice systems that must register invoices on-chain.
+Hash-based invoice systems require on-chain registration, making this level of privacy difficult to achieve.
 
 ---
 
@@ -66,7 +66,7 @@ This is architecturally impossible with hash-based invoice systems that must reg
 ## Smart Contract: 6 Transitions, 4 Records, Zero Leaks
 
 ```
-program private_split_v1.aleo (deployed) / private_split_v2.aleo (ready)
+program private_split_v1.aleo (deployed on testnet) / private_split_v2.aleo (deployed on testnet)
 │
 ├── Records (ALL private, encrypted to owner)
 │   ├── Split         — Creator's record (total, per-person, count, expiry)
@@ -153,7 +153,7 @@ Creator                              Participant
 
 **Frontend — Feature-Rich Expense Splitting (Wave 2 Overhaul)**
 - Full UI redesign: glassmorphic dark fintech aesthetic with Inter + JetBrains Mono typography
-- NEW: 8 expense categories (Dinner, Groceries, Rent, Travel, Utilities, Entertainment, Shopping, Other) with emoji tags and colored badges
+- NEW: 8 expense categories (Dinner, Groceries, Rent, Travel, Utilities, Entertainment, Shopping, Other) with Lucide icons and colored badges
 - NEW: Split expiry selection (1h, 24h, 3d, 7d, 30d, or no expiry)
 - NEW: Token type toggle (ALEO credits / USDCx) — USDCx ready for v2 deployment
 - NEW: My Splits dashboard — personal wallet-filtered view with activity chart, category breakdown, stat cards
@@ -172,7 +172,7 @@ Creator                              Participant
 - Responsive mobile layout with slide-out navigation
 
 **Backend v2**
-- Node.js + Express + Supabase
+- Vercel Serverless Functions (demo) / Node.js + Express + Supabase (production)
 - AES-256-GCM encrypted storage for all sensitive fields
 - REST API for cross-device split recovery
 - NEW: `/api/stats` endpoint — network-wide statistics (total splits, volume, categories, daily activity)
@@ -227,17 +227,19 @@ curl https://api.provable.com/v2/testnet/program/private_split_v1.aleo/mapping/s
 │  Glassmorphic UI: Inter + JetBrains Mono, dark theme       │
 │  11 pages · Categories · Expiry · Token types · Receipts   │
 ├───────────────────────────────────────────────────────────┤
-│  LEO SMART CONTRACT  (private_split_v1.aleo / v2 ready)   │
+│  LEO SMART CONTRACT  (private_split_v1.aleo / v2.aleo)    │
 │  Aleo Testnet — 6 transitions, 4 records, 2 mappings      │
 │  Zero amounts in mappings · Zero private data in finalize  │
 │  issue_debt: NO finalize (100% private operation)          │
 │  v2: expiry system, expire_split transition                │
 ├───────────────────────────────────────────────────────────┤
-│  BACKEND  (Node.js + Express + Supabase)                  │
+│  BACKEND  (Vercel Serverless / Express + Supabase)         │
 │  AES-256-GCM encrypted: addresses + amounts               │
 │  REST API: splits, stats, receipts, cross-device recovery  │
 └───────────────────────────────────────────────────────────┘
 ```
+
+**Note:** The live demo at privatesplit.vercel.app uses Vercel serverless functions with pre-populated sample data. The production backend (in `/backend/`) uses Supabase PostgreSQL with AES-256-GCM encryption for all sensitive fields.
 
 ---
 
@@ -252,8 +254,8 @@ curl https://api.provable.com/v2/testnet/program/private_split_v1.aleo/mapping/s
 | Typography | Inter (UI) + JetBrains Mono (data) |
 | State | Zustand + localStorage |
 | Wallet | Shield Wallet (primary), Leo, Puzzle, Fox, Soter |
-| Backend | Node.js + Express |
-| Database | Supabase (PostgreSQL) |
+| Backend | Vercel Serverless (demo) / Express (production) |
+| Database | In-Memory Store (demo) / Supabase (production) |
 | Encryption | AES-256-GCM |
 | Deployment | Vercel |
 
@@ -280,7 +282,6 @@ curl https://api.provable.com/v2/testnet/program/private_split_v1.aleo/mapping/s
 - Mobile app (React Native / Expo)
 - Multi-payment invoices (pay partial amounts)
 - Dispute resolution system with on-chain evidence
-- Video demo walkthrough
 
 ---
 
