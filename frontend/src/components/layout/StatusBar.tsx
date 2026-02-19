@@ -1,5 +1,6 @@
 import { useWallet } from '@provablehq/aleo-wallet-adaptor-react';
 import { truncateAddress } from '../../utils/format';
+import { PROGRAM_ID } from '../../utils/constants';
 import { ChangelogButton } from '../ChangelogOverlay';
 
 export function StatusBar() {
@@ -14,8 +15,8 @@ export function StatusBar() {
             <span className="text-cyan-400">TESTNET</span>
           </span>
           <span className="text-white/[0.1]">|</span>
-          <span className="text-white/30 hidden sm:inline">private_split_v1.aleo</span>
-          <span className="text-white/30 sm:hidden">ps_v1.aleo</span>
+          <span className="text-white/30 hidden sm:inline">{PROGRAM_ID}</span>
+          <span className="text-white/30 sm:hidden">ps_v2.aleo</span>
           <span className="text-white/[0.1]">|</span>
           <ChangelogButton />
         </div>
