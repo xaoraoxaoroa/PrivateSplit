@@ -30,52 +30,52 @@ export function useSettleSplit() {
       let resolvedProgram = PROGRAM_ID;
 
       const programsToCheck = [PROGRAM_ID, PROGRAM_ID_V1];
+      const candidates: { input: string; program: string }[] = [];
 
       for (const programId of programsToCheck) {
-        if (splitRecordInput) break;
-        for (let attempt = 0; attempt < 3 && !splitRecordInput; attempt++) {
-          if (attempt > 0) {
-            addLog(`Retrying record fetch (attempt ${attempt + 1}/3)...`, 'info');
-            await new Promise((r) => setTimeout(r, 2000));
-          }
-          try {
-            const records = (await requestRecords(programId)) as any[];
-            addLog(`Found ${records?.length || 0} records from ${programId}`, 'info');
+        try {
+          const records = (await requestRecords(programId)) as any[];
+          addLog(`Found ${records?.length || 0} records from ${programId}`, 'info');
 
-            for (const r of records || []) {
-              if (r.spent) continue;
-              let plaintext = r.plaintext || '';
+          for (const r of records || []) {
+            if (r.spent) continue;
+            let plaintext = r.plaintext || '';
 
-              if (!plaintext && r.recordCiphertext && decrypt) {
-                try {
-                  const decrypted = await decrypt(r.recordCiphertext);
-                  if (decrypted) {
-                    plaintext = decrypted;
-                    r.plaintext = decrypted;
-                  }
-                } catch { /* continue */ }
-              }
-
-              const recordInput = r.plaintext || r.ciphertext || r.recordCiphertext || null;
-              const matchesSplit = recordMatchesSplitContext(plaintext, r.data, salt || '', splitId);
-              const isSplit = isSplitRecord(plaintext, r.data);
-
-              if (matchesSplit && isSplit && recordInput) {
-                splitRecordInput = recordInput;
-                resolvedProgram = programId;
-                addLog(`Found matching Split record (${programId})`, 'success');
-                break;
-              }
-              if (isSplit && !splitRecordInput && recordInput) {
-                splitRecordInput = recordInput;
-                resolvedProgram = programId;
-                addLog(`Found Split record candidate (${programId})`, 'info');
-              }
+            if (!plaintext && r.recordCiphertext && decrypt) {
+              try {
+                const decrypted = await decrypt(r.recordCiphertext);
+                if (decrypted) { plaintext = decrypted; r.plaintext = decrypted; }
+              } catch { /* continue */ }
             }
-          } catch (err: any) {
-            addLog(`Record fetch: ${err.message}`, 'warning');
+
+            const recordInput = r.plaintext || r.ciphertext || r.recordCiphertext || null;
+            if (!recordInput) continue;
+
+            const isSplit = isSplitRecord(plaintext, r.data);
+            const matchesSplit = recordMatchesSplitContext(plaintext, r.data, salt || '', splitId);
+
+            if (matchesSplit && isSplit) {
+              splitRecordInput = recordInput;
+              resolvedProgram = programId;
+              addLog(`Found matching Split record (${programId})`, 'success');
+              break;
+            }
+            if (isSplit) {
+              candidates.unshift({ input: recordInput, program: programId });
+            } else {
+              candidates.push({ input: recordInput, program: programId });
+            }
           }
+        } catch (err: any) {
+          addLog(`Record fetch: ${err.message}`, 'warning');
         }
+        if (splitRecordInput) break;
+      }
+
+      if (!splitRecordInput && candidates.length > 0) {
+        splitRecordInput = candidates[0].input;
+        resolvedProgram = candidates[0].program;
+        addLog(`Using record candidate from ${resolvedProgram}`, 'info');
       }
 
       if (!splitRecordInput) {
