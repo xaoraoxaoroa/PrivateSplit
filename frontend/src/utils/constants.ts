@@ -14,13 +14,10 @@ export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 export const DEFAULT_FEE = 100_000; // microcredits
 
 // Expiry options (hours)
+// NOTE: Non-zero expiry is disabled — v2 contract stores relative block count
+// instead of absolute block height, causing immediate expiry. Needs v3 fix.
 export const EXPIRY_OPTIONS = [
   { value: 0, label: 'No Expiry' },
-  { value: 1, label: '1 Hour' },
-  { value: 24, label: '24 Hours' },
-  { value: 72, label: '3 Days' },
-  { value: 168, label: '7 Days' },
-  { value: 720, label: '30 Days' },
 ];
 
 // Blocks per hour on Aleo Testnet (~10s block time)

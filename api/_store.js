@@ -179,26 +179,37 @@ function buildStats(splits) {
 
 export const useSupabase = !!supabase;
 
+// Wrapper: try Supabase, fall back to in-memory on any error
+async function withFallback(supaFn, memFn, ...args) {
+  if (!supabase) return memFn(...args);
+  try {
+    return await supaFn(...args);
+  } catch (err) {
+    console.warn('Supabase error, falling back to in-memory:', err.message || err);
+    return memFn(...args);
+  }
+}
+
 export async function getSplits(opts) {
-  return supabase ? supaGetSplits(opts) : memGetSplits(opts);
+  return withFallback(supaGetSplits, memGetSplits, opts);
 }
 
 export async function getSplit(splitId) {
-  return supabase ? supaGetSplit(splitId) : memGetSplit(splitId);
+  return withFallback(supaGetSplit, memGetSplit, splitId);
 }
 
 export async function addSplit(split) {
-  return supabase ? supaAddSplit(split) : memAddSplit(split);
+  return withFallback(supaAddSplit, memAddSplit, split);
 }
 
 export async function updateSplit(splitId, updates) {
-  return supabase ? supaUpdateSplit(splitId, updates) : memUpdateSplit(splitId, updates);
+  return withFallback(supaUpdateSplit, memUpdateSplit, splitId, updates);
 }
 
 export async function getSplitsByCreator(address) {
-  return supabase ? supaGetSplitsByCreator(address) : memGetSplitsByCreator(address);
+  return withFallback(supaGetSplitsByCreator, memGetSplitsByCreator, address);
 }
 
 export async function getStats() {
-  return supabase ? supaGetStats() : memGetStats();
+  return withFallback(supaGetStats, memGetStats);
 }

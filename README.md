@@ -2,7 +2,7 @@
 
 > Split expenses with friends without revealing who owes what, how much, or who paid.
 
-**Live Demo:** https://privatesplit.vercel.app
+**Live Demo:** https://private-split.vercel.app
 **Contract:** `private_split_v2.aleo` on Aleo Testnet (v1 also deployed)
 **Built for:** Aleo Privacy Buildathon by AKINDO — Wave 2
 **GitHub:** https://github.com/xaoraoxaoroa/privatesplit
@@ -190,7 +190,7 @@ Creator                              Participant
 
 ### Step-by-Step
 
-1. **Connect**: Visit https://privatesplit.vercel.app → Connect Shield Wallet
+1. **Connect**: Visit https://private-split.vercel.app → Connect Shield Wallet
 2. **Create**: Go to Create → Enter description, total amount, participant count + addresses
 3. **Issue Debts**: On the split detail page → click "ISSUE" for each participant
 4. **Share**: Copy the payment link or scan the QR code
@@ -222,7 +222,7 @@ curl https://api.provable.com/v2/testnet/program/private_split_v2.aleo/mapping/s
 ```
 ┌───────────────────────────────────────────────────────────┐
 │  FRONTEND  (React 18 + TypeScript + Vite + Tailwind)      │
-│  Live: privatesplit.vercel.app                             │
+│  Live: private-split.vercel.app                             │
 │  Shield Wallet via @provablehq/aleo-wallet-adaptor-react   │
 │  Glassmorphic UI: Inter + JetBrains Mono, dark theme       │
 │  11 pages · Categories · Expiry · Token types · Receipts   │
