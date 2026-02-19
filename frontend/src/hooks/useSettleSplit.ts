@@ -5,7 +5,7 @@ import { PROGRAM_ID, PROGRAM_ID_V1 } from '../utils/constants';
 import { pollTransaction } from '../utils/aleo-utils';
 import { useSplitStore, useUIStore } from '../store/splitStore';
 import { api } from '../services/api';
-import { isSplitRecord, recordMatchesSplitContext } from '../utils/record-utils';
+import { isSplitRecord, recordMatchesSplitContext, getRecordInput } from '../utils/record-utils';
 
 export function useSettleSplit() {
   const { address, executeTransaction, requestRecords, decrypt, wallet } = useWallet();
@@ -26,11 +26,11 @@ export function useSettleSplit() {
 
     try {
       addLog('Requesting Split records from wallet...', 'system');
-      let splitRecordInput: string | null = null;
+      let splitRecordInput: any = null;
       let resolvedProgram = PROGRAM_ID;
 
       const programsToCheck = [PROGRAM_ID, PROGRAM_ID_V1];
-      const candidates: { input: string; program: string }[] = [];
+      const candidates: { input: any; program: string }[] = [];
 
       for (const programId of programsToCheck) {
         try {
@@ -39,18 +39,9 @@ export function useSettleSplit() {
 
           for (const r of records || []) {
             if (r.spent) continue;
-            let plaintext = r.plaintext || '';
 
-            if (!plaintext && r.recordCiphertext && decrypt) {
-              try {
-                const decrypted = await decrypt(r.recordCiphertext);
-                if (decrypted) { plaintext = decrypted; r.plaintext = decrypted; }
-              } catch { /* continue */ }
-            }
-
-            const recordInput = r.plaintext || r.ciphertext || r.recordCiphertext
-              || (typeof r === 'string' ? r : null);
-            if (!recordInput) continue;
+            // Use robust extraction: plaintext → decrypt → reconstruct → ciphertext → raw object
+            const { input: recordInput, plaintext } = await getRecordInput(r, decrypt || null);
 
             const isSplit = isSplitRecord(plaintext, r.data);
             const matchesSplit = recordMatchesSplitContext(plaintext, r.data, salt || '', splitId);
@@ -87,7 +78,7 @@ export function useSettleSplit() {
       }
 
       // settle_split takes exactly 1 input: the Split record
-      const inputs: string[] = [splitRecordInput];
+      const inputs: any[] = [splitRecordInput];
 
       addLog(`Executing settle_split on ${resolvedProgram}...`, 'system');
 

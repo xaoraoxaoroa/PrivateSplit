@@ -11,6 +11,7 @@ import {
   extractField,
   getMicrocreditsFromRecord,
   buildCreditsRecordPlaintext,
+  getRecordInput,
 } from '../utils/record-utils';
 import type { PaymentStep } from '../types/split';
 
@@ -69,7 +70,7 @@ export function usePaySplit() {
       setStep('convert');
       addLog('Searching for Debt record in wallet...', 'system');
 
-      let debtRecordInput: string | null = null;
+      let debtRecordInput: any = null;
       let debtAmount = 0;
       let resolvedProgram = PROGRAM_ID;
 
@@ -92,9 +93,10 @@ export function usePaySplit() {
 
           for (const r of programRecords || []) {
             if (r.spent) continue;
-            const plaintext = r.plaintext || '';
 
-            // Robust matching: check salt OR split_id AND must be a Debt record
+            // Use robust extraction: plaintext → decrypt → reconstruct → ciphertext → raw object
+            const { input: recordInput, plaintext } = await getRecordInput(r, decrypt || null);
+
             const matches = recordMatchesSplitContext(
               plaintext,
               r.data,
@@ -104,9 +106,8 @@ export function usePaySplit() {
             const isDebt = isDebtRecord(plaintext, r.data);
 
             if (matches && isDebt) {
-              debtRecordInput = r.plaintext || r.ciphertext;
+              debtRecordInput = recordInput;
               resolvedProgram = progId;
-              // Extract amount precisely using field parser
               const rawAmount = extractField(plaintext, 'amount') || extractField(plaintext, 'per_person');
               if (rawAmount) {
                 debtAmount = parseInt(rawAmount.replace(/u64|u128/g, ''));
@@ -269,20 +270,22 @@ export function usePaySplit() {
         return false;
       }
 
-      const creditsInput = buildCreditsRecordPlaintext(payRecord);
+      let creditsInput: any = buildCreditsRecordPlaintext(payRecord);
       if (!creditsInput) {
-        setError('Could not extract credits record data. Try refreshing your wallet.');
-        setStep('error');
-        return false;
+        // Last resort: pass raw record object (NullPay pattern)
+        creditsInput = payRecord;
+        addLog('Using raw credits record object as input', 'warning');
       }
 
       // Step 5: Execute pay_debt(debt_record, credits_record)
       setStep('pay');
       addLog(`Executing pay_debt on ${resolvedProgram}...`, 'system');
 
-      const inputs = [debtRecordInput, creditsInput];
-      addLog(`Debt: ${debtRecordInput.slice(0, 40)}...`, 'info');
-      addLog(`Credits: ${creditsInput.slice(0, 40)}...`, 'info');
+      const inputs: any[] = [debtRecordInput, creditsInput];
+      const debtStr = typeof debtRecordInput === 'string' ? debtRecordInput.slice(0, 40) : JSON.stringify(debtRecordInput).slice(0, 40);
+      const credStr = typeof creditsInput === 'string' ? creditsInput.slice(0, 40) : JSON.stringify(creditsInput).slice(0, 40);
+      addLog(`Debt: ${debtStr}...`, 'info');
+      addLog(`Credits: ${credStr}...`, 'info');
 
       const transaction: TransactionOptions = {
         program: resolvedProgram,

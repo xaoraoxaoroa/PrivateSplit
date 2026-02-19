@@ -4,7 +4,7 @@ import { TransactionOptions } from '@provablehq/aleo-types';
 import { PROGRAM_ID, PROGRAM_ID_V1 } from '../utils/constants';
 import { pollTransaction } from '../utils/aleo-utils';
 import { useSplitStore, useUIStore } from '../store/splitStore';
-import { isSplitRecord, recordMatchesSplitContext } from '../utils/record-utils';
+import { isSplitRecord, recordMatchesSplitContext, getRecordInput } from '../utils/record-utils';
 
 export function useIssueDebt() {
   const { address, executeTransaction, requestRecords, decrypt, wallet } = useWallet();
@@ -25,14 +25,14 @@ export function useIssueDebt() {
 
     try {
       addLog('Requesting Split records from wallet...', 'system');
-      let splitRecordInput: string | null = null;
+      let splitRecordInput: any = null;
       let resolvedProgram = PROGRAM_ID;
 
       // Try both v2 and v1 programs (split may have been created on either)
       const programsToCheck = [PROGRAM_ID, PROGRAM_ID_V1];
 
       // Collect all unspent record inputs from both programs
-      const candidates: { input: string; program: string }[] = [];
+      const candidates: { input: any; program: string }[] = [];
 
       for (const programId of programsToCheck) {
         try {
@@ -41,23 +41,9 @@ export function useIssueDebt() {
 
           for (const r of records || []) {
             if (r.spent) continue;
-            let plaintext = r.plaintext || '';
 
-            // Try decrypting if no plaintext
-            if (!plaintext && r.recordCiphertext && decrypt) {
-              try {
-                const decrypted = await decrypt(r.recordCiphertext);
-                if (decrypted) { plaintext = decrypted; r.plaintext = decrypted; }
-              } catch { /* continue */ }
-            }
-
-            // Try all known properties for record input string
-            const recordInput = r.plaintext || r.ciphertext || r.recordCiphertext
-              || (typeof r === 'string' ? r : null);
-            if (!recordInput) {
-              addLog(`Record has no extractable input (keys: ${Object.keys(r).join(', ')})`, 'warning');
-              continue;
-            }
+            // Use robust extraction: plaintext → decrypt → reconstruct → ciphertext → raw object
+            const { input: recordInput, plaintext } = await getRecordInput(r, decrypt || null);
 
             // If we can read the record, prefer exact matches
             const isSplit = isSplitRecord(plaintext, r.data);
@@ -70,7 +56,6 @@ export function useIssueDebt() {
               break;
             }
             if (isSplit) {
-              // Known Split record but no context match — use as candidate
               candidates.unshift({ input: recordInput, program: programId });
               addLog(`Found Split record candidate (${programId})`, 'info');
             } else {
