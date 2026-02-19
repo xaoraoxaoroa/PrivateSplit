@@ -7,7 +7,7 @@ import { useSplitStore, useUIStore } from '../store/splitStore';
 import { isSplitRecord, recordMatchesSplitContext } from '../utils/record-utils';
 
 export function useIssueDebt() {
-  const { address, executeTransaction, requestRecords, wallet } = useWallet();
+  const { address, executeTransaction, requestRecords, decrypt, wallet } = useWallet();
   const updateSplit = useSplitStore((s) => s.updateSplit);
   const addLog = useUIStore((s) => s.addLog);
   const [loading, setLoading] = useState(false);
@@ -44,20 +44,32 @@ export function useIssueDebt() {
 
             for (const r of records || []) {
               if (r.spent) continue;
-              const plaintext = r.plaintext || '';
+              let plaintext = r.plaintext || '';
 
+              // Try decrypting if no plaintext but has ciphertext
+              if (!plaintext && r.recordCiphertext && decrypt) {
+                try {
+                  const decrypted = await decrypt(r.recordCiphertext);
+                  if (decrypted) {
+                    plaintext = decrypted;
+                    r.plaintext = decrypted;
+                  }
+                } catch { /* continue */ }
+              }
+
+              const recordInput = r.plaintext || r.ciphertext || r.recordCiphertext || null;
               const matchesSplit = recordMatchesSplitContext(plaintext, r.data, salt || '', splitId);
               const isSplit = isSplitRecord(plaintext, r.data);
 
-              if (matchesSplit && isSplit) {
-                splitRecordInput = r.plaintext || r.ciphertext;
+              if (matchesSplit && isSplit && recordInput) {
+                splitRecordInput = recordInput;
                 resolvedProgram = programId;
                 addLog(`Found matching Split record (${programId})`, 'success');
                 break;
               }
               // Fallback: if it's a Split record, keep as candidate
-              if (isSplit && !splitRecordInput) {
-                splitRecordInput = r.plaintext || r.ciphertext;
+              if (isSplit && !splitRecordInput && recordInput) {
+                splitRecordInput = recordInput;
                 resolvedProgram = programId;
                 addLog(`Found Split record candidate (${programId})`, 'info');
               }
