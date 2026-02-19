@@ -64,7 +64,7 @@ export function SplitDetail() {
   };
 
   const handleSettle = () => {
-    settleSplit(split.split_id);
+    settleSplit(split.split_id, split.salt);
   };
 
   const handleExportReceipt = async (type: 'payer' | 'creator') => {
@@ -272,7 +272,7 @@ export function SplitDetail() {
                   size="sm"
                   onClick={async () => {
                     setIssuingTo(p.address);
-                    await issueDebt(split.split_id, p.address);
+                    await issueDebt(split.split_id, p.address, split.salt);
                     setIssuingTo(null);
                   }}
                   loading={issueLoading && issuingTo === p.address}

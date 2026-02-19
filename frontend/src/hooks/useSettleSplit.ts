@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useWallet } from '@provablehq/aleo-wallet-adaptor-react';
 import { TransactionOptions } from '@provablehq/aleo-types';
-import { PROGRAM_ID } from '../utils/constants';
+import { PROGRAM_ID, PROGRAM_ID_V1 } from '../utils/constants';
 import { pollTransaction } from '../utils/aleo-utils';
 import { useSplitStore, useUIStore } from '../store/splitStore';
 import { api } from '../services/api';
@@ -14,7 +14,7 @@ export function useSettleSplit() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const settleSplit = useCallback(async (splitId: string) => {
+  const settleSplit = useCallback(async (splitId: string, salt?: string) => {
     if (!address || !executeTransaction || !requestRecords) {
       setError('Wallet not connected');
       return false;
@@ -27,33 +27,44 @@ export function useSettleSplit() {
     try {
       addLog('Requesting Split records from wallet...', 'system');
       let splitRecordInput: string | null = null;
+      let resolvedProgram = PROGRAM_ID;
 
-      // Retry fetch up to 3 times
-      for (let attempt = 0; attempt < 3 && !splitRecordInput; attempt++) {
-        if (attempt > 0) {
-          addLog(`Retrying record fetch (attempt ${attempt + 1}/3)...`, 'info');
-          await new Promise((r) => setTimeout(r, 2000));
-        }
-        try {
-          const records = (await requestRecords(PROGRAM_ID)) as any[];
-          addLog(`Found ${records?.length || 0} program records`, 'info');
+      const programsToCheck = [PROGRAM_ID, PROGRAM_ID_V1];
 
-          for (const r of records || []) {
-            if (r.spent) continue;
-            const plaintext = r.plaintext || '';
-
-            // Must match this split AND be a Split record (not Debt/Receipt)
-            const matchesSplit = recordMatchesSplitContext(plaintext, r.data, '', splitId);
-            const isSplit = isSplitRecord(plaintext, r.data);
-
-            if (matchesSplit && isSplit) {
-              splitRecordInput = r.plaintext || r.ciphertext;
-              addLog('Found matching Split record', 'success');
-              break;
-            }
+      for (const programId of programsToCheck) {
+        if (splitRecordInput) break;
+        for (let attempt = 0; attempt < 3 && !splitRecordInput; attempt++) {
+          if (attempt > 0) {
+            addLog(`Retrying record fetch (attempt ${attempt + 1}/3)...`, 'info');
+            await new Promise((r) => setTimeout(r, 2000));
           }
-        } catch (err: any) {
-          addLog(`Record fetch: ${err.message}`, 'warning');
+          try {
+            const records = (await requestRecords(programId)) as any[];
+            addLog(`Found ${records?.length || 0} records from ${programId}`, 'info');
+
+            for (const r of records || []) {
+              if (r.spent) continue;
+              const plaintext = r.plaintext || '';
+
+              const matchesSplit = recordMatchesSplitContext(plaintext, r.data, salt || '', splitId);
+              const isSplit = isSplitRecord(plaintext, r.data);
+
+              if (matchesSplit && isSplit) {
+                splitRecordInput = r.plaintext || r.ciphertext;
+                resolvedProgram = programId;
+                addLog(`Found matching Split record (${programId})`, 'success');
+                break;
+              }
+              // Fallback: any unspent Split record as candidate
+              if (isSplit && !splitRecordInput) {
+                splitRecordInput = r.plaintext || r.ciphertext;
+                resolvedProgram = programId;
+                addLog(`Found Split record candidate (${programId})`, 'info');
+              }
+            }
+          } catch (err: any) {
+            addLog(`Record fetch: ${err.message}`, 'warning');
+          }
         }
       }
 
@@ -67,8 +78,10 @@ export function useSettleSplit() {
       // settle_split takes exactly 1 input: the Split record
       const inputs: string[] = [splitRecordInput];
 
+      addLog(`Executing settle_split on ${resolvedProgram}...`, 'system');
+
       const transaction: TransactionOptions = {
-        program: PROGRAM_ID,
+        program: resolvedProgram,
         function: 'settle_split',
         inputs: inputs,
         fee: 100_000,

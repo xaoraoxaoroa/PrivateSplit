@@ -13,7 +13,7 @@ export function useIssueDebt() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const issueDebt = useCallback(async (splitId: string, participant: string) => {
+  const issueDebt = useCallback(async (splitId: string, participant: string, salt?: string) => {
     if (!address || !executeTransaction || !requestRecords) {
       setError('Wallet not connected');
       return false;
@@ -46,7 +46,7 @@ export function useIssueDebt() {
               if (r.spent) continue;
               const plaintext = r.plaintext || '';
 
-              const matchesSplit = recordMatchesSplitContext(plaintext, r.data, '', splitId);
+              const matchesSplit = recordMatchesSplitContext(plaintext, r.data, salt || '', splitId);
               const isSplit = isSplitRecord(plaintext, r.data);
 
               if (matchesSplit && isSplit) {
@@ -54,6 +54,12 @@ export function useIssueDebt() {
                 resolvedProgram = programId;
                 addLog(`Found matching Split record (${programId})`, 'success');
                 break;
+              }
+              // Fallback: if it's a Split record, keep as candidate
+              if (isSplit && !splitRecordInput) {
+                splitRecordInput = r.plaintext || r.ciphertext;
+                resolvedProgram = programId;
+                addLog(`Found Split record candidate (${programId})`, 'info');
               }
             }
           } catch (err: any) {
