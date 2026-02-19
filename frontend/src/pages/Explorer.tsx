@@ -67,7 +67,7 @@ export function Explorer() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch network stats and recent splits
+  // Fetch network stats and recent splits, auto-load demo split
   useEffect(() => {
     setStatsLoading(true);
     Promise.all([
@@ -77,6 +77,16 @@ export function Explorer() {
       setNetworkStats(stats);
       setRecentSplits(recent);
     }).finally(() => setStatsLoading(false));
+
+    // Auto-load demo split so judges see a result immediately
+    const demoSplitId = '1904758949858929157912240259749859140762221531679669196161601694830550064831field';
+    getSplitStatus(demoSplitId).then((status) => {
+      if (status) {
+        setSplitResult({ split_id: demoSplitId, ...status });
+        setQuery(demoSplitId);
+        setSearchType('split_id');
+      }
+    }).catch(() => {});
   }, []);
 
   const categoryChartData = networkStats

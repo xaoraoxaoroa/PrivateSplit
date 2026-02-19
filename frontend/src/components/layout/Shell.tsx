@@ -4,6 +4,7 @@ import { CommandBar } from './CommandBar';
 import { StatusBar } from './StatusBar';
 import { ToastContainer } from '../ui/Toast';
 import { AnimatedBackground } from '../AnimatedBackground';
+import { OnboardingModal } from '../OnboardingModal';
 
 export function Shell() {
   const location = useLocation();
@@ -20,6 +21,7 @@ export function Shell() {
         </main>
         <StatusBar />
         <ToastContainer />
+        <OnboardingModal />
       </div>
     </div>
   );

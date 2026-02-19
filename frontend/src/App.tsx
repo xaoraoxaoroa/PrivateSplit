@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { WalletProvider } from './hooks/WalletProvider';
 import { Shell } from './components/layout/Shell';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -6,7 +6,6 @@ import { Dashboard } from './pages/Dashboard';
 import { CreateSplit } from './pages/CreateSplit';
 import { PaySplit } from './pages/PaySplit';
 import { SplitDetail } from './pages/SplitDetail';
-import { History } from './pages/History';
 import { MySplits } from './pages/MySplits';
 import { Connect } from './pages/Connect';
 import { Explorer } from './pages/Explorer';
@@ -26,7 +25,7 @@ export default function App() {
               <Route path="/create" element={<ErrorBoundary><CreateSplit /></ErrorBoundary>} />
               <Route path="/pay" element={<ErrorBoundary><PaySplit /></ErrorBoundary>} />
               <Route path="/split/:hash" element={<ErrorBoundary><SplitDetail /></ErrorBoundary>} />
-              <Route path="/history" element={<ErrorBoundary><History /></ErrorBoundary>} />
+              <Route path="/history" element={<Navigate to="/my-splits" replace />} />
               <Route path="/my-splits" element={<ErrorBoundary><MySplits /></ErrorBoundary>} />
               <Route path="/explorer" element={<ErrorBoundary><Explorer /></ErrorBoundary>} />
               <Route path="/verify" element={<ErrorBoundary><Verification /></ErrorBoundary>} />

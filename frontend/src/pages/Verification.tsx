@@ -3,9 +3,11 @@ import { useWallet } from '@provablehq/aleo-wallet-adaptor-react';
 import { TerminalCard, TerminalButton, TerminalBadge } from '../components/ui';
 import { PROGRAM_ID } from '../utils/constants';
 import { getSplitStatus } from '../utils/aleo-utils';
+import { parseRecordFields } from '../utils/record-utils';
+import { microToCredits, truncateAddress } from '../utils/format';
 import { Link } from 'react-router-dom';
 import { PageTransition } from '../components/PageTransition';
-import { Shield, CheckCircle2, XCircle, Search, FileCheck, Lock } from 'lucide-react';
+import { Shield, CheckCircle2, XCircle, Search, FileCheck, Lock, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 
 interface VerificationResult {
   splitId: string;
@@ -14,6 +16,80 @@ interface VerificationResult {
   paymentCount: number;
   participantCount: number;
   receiptFound: boolean;
+}
+
+function ReceiptCard({ index, receiptType, fields, hasFields, plaintext }: {
+  index: number; receiptType: string; fields: Record<string, string>; hasFields: boolean; plaintext: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(plaintext);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="glass-card-subtle p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+          <p className="text-emerald-400 font-medium text-xs">
+            {receiptType} #{index + 1}
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button onClick={handleCopy} className="p-1 rounded hover:bg-white/[0.06] transition-colors" title="Copy plaintext">
+            <Copy className="w-3 h-3 text-white/30 hover:text-white/60" />
+          </button>
+          <button onClick={() => setExpanded(!expanded)} className="p-1 rounded hover:bg-white/[0.06] transition-colors">
+            {expanded ? <ChevronUp className="w-3 h-3 text-white/30" /> : <ChevronDown className="w-3 h-3 text-white/30" />}
+          </button>
+        </div>
+      </div>
+
+      {hasFields ? (
+        <div className="space-y-1.5 text-xs">
+          {fields.split_id && (
+            <div className="flex justify-between gap-2">
+              <span className="text-white/40 shrink-0">Split ID</span>
+              <span className="text-white/70 font-mono text-[10px] truncate">{truncateAddress(fields.split_id, 12)}</span>
+            </div>
+          )}
+          {fields.amount && (
+            <div className="flex justify-between">
+              <span className="text-white/40">Amount</span>
+              <span className="text-emerald-400 font-mono">{microToCredits(parseInt(fields.amount.replace(/u64|u128/g, '')))} credits</span>
+            </div>
+          )}
+          {fields.creditor && (
+            <div className="flex justify-between gap-2">
+              <span className="text-white/40">Creditor</span>
+              <span className="text-white/70 font-mono text-[10px]">{truncateAddress(fields.creditor)}</span>
+            </div>
+          )}
+          {fields.payer && (
+            <div className="flex justify-between gap-2">
+              <span className="text-white/40">Payer</span>
+              <span className="text-white/70 font-mono text-[10px]">{truncateAddress(fields.payer)}</span>
+            </div>
+          )}
+        </div>
+      ) : (
+        <p className="text-white/30 text-[10px]">Encrypted record — fields not readable</p>
+      )}
+
+      {expanded && (
+        <div className="bg-black/30 border border-white/[0.06] rounded-lg p-2 mt-2">
+          <p className="text-white/40 break-all font-mono text-[10px] whitespace-pre-wrap">
+            {plaintext || 'Encrypted — cannot display plaintext'}
+          </p>
+        </div>
+      )}
+      {copied && <p className="text-[10px] text-emerald-400">Copied to clipboard</p>}
+    </div>
+  );
 }
 
 export function Verification() {
@@ -152,18 +228,25 @@ export function Verification() {
       {/* Results */}
       {receipts.length > 0 && (
         <TerminalCard title={`FOUND ${receipts.length} RECEIPT${receipts.length !== 1 ? 'S' : ''}`}>
-          <div className="space-y-2 text-xs">
-            {receipts.map((r, i) => (
-              <div key={i} className="glass-card-subtle p-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <p className="text-emerald-400 font-medium">Receipt #{i + 1}</p>
-                </div>
-                <p className="text-white/40 break-all mt-1 font-mono text-[11px]">
-                  {r.plaintext?.slice(0, 120) || 'Encrypted record'}...
-                </p>
-              </div>
-            ))}
+          <div className="space-y-3 text-xs">
+            {receipts.map((r, i) => {
+              const fields = parseRecordFields(r.plaintext || '');
+              const hasFields = Object.keys(fields).length > 0;
+              const isPayerReceipt = !fields.payer && fields.creditor;
+              const isCreatorReceipt = !!fields.payer;
+              const receiptType = isCreatorReceipt ? 'CreatorReceipt' : isPayerReceipt ? 'PayerReceipt' : 'Receipt';
+
+              return (
+                <ReceiptCard
+                  key={i}
+                  index={i}
+                  receiptType={receiptType}
+                  fields={fields}
+                  hasFields={hasFields}
+                  plaintext={r.plaintext || ''}
+                />
+              );
+            })}
           </div>
         </TerminalCard>
       )}

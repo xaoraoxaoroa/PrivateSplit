@@ -4,8 +4,9 @@ import { TerminalCard, TerminalButton, TerminalProgress, LogEntry } from '../com
 import { usePaySplit } from '../hooks/usePaySplit';
 import { useUIStore } from '../store/splitStore';
 import { microToCredits, truncateAddress } from '../utils/format';
+import { DEFAULT_FEE } from '../utils/constants';
 import { PageTransition } from '../components/PageTransition';
-import { CheckCircle2, AlertCircle, ArrowLeft, Clock, Zap } from 'lucide-react';
+import { CheckCircle2, AlertCircle, ArrowLeft, Clock, Zap, ExternalLink, Download, Info } from 'lucide-react';
 
 export function PaySplit() {
   const [params] = useSearchParams();
@@ -95,36 +96,73 @@ export function PaySplit() {
             </Link>
           ) : step === 'success' ? (
             <TerminalCard variant="accent">
-              <div className="text-center py-4">
+              <div className="text-center py-4 space-y-4">
                 <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
+                  className="w-12 h-12 rounded-full flex items-center justify-center mx-auto"
                   style={{ background: 'rgba(52, 211, 153, 0.1)', border: '1px solid rgba(52, 211, 153, 0.2)' }}
                 >
                   <CheckCircle2 className="w-6 h-6 text-emerald-400" />
                 </div>
-                <p className="text-emerald-400 font-medium mb-1">Payment Confirmed</p>
-                {txId && (
-                  <p className="text-xs text-white/40 mt-1 font-mono">
-                    TX: {truncateAddress(txId, 10)}
-                  </p>
+                <div>
+                  <p className="text-emerald-400 font-medium mb-1">Payment Confirmed</p>
+                  <p className="text-[10px] text-white/30">Your payment is private — only you and the creator have receipts</p>
+                </div>
+                {txId && txId.startsWith('at1') && (
+                  <a
+                    href={`https://testnet.explorer.provable.com/transaction/${txId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-cyan-400 hover:text-emerald-400 transition-colors font-mono"
+                  >
+                    <ExternalLink className="w-3 h-3" /> View on Explorer: {truncateAddress(txId, 8)}
+                  </a>
                 )}
-                <Link to="/" className="block mt-4">
-                  <TerminalButton variant="secondary">
-                    <ArrowLeft className="w-3.5 h-3.5" /> BACK TO DASHBOARD
-                  </TerminalButton>
-                </Link>
+                <div className="flex gap-2">
+                  <Link to="/" className="flex-1">
+                    <TerminalButton variant="secondary" className="w-full">
+                      <ArrowLeft className="w-3.5 h-3.5" /> DASHBOARD
+                    </TerminalButton>
+                  </Link>
+                  <Link to="/verify" className="flex-1">
+                    <TerminalButton variant="secondary" className="w-full">
+                      <Download className="w-3.5 h-3.5" /> VERIFY RECEIPT
+                    </TerminalButton>
+                  </Link>
+                </div>
               </div>
             </TerminalCard>
           ) : (
-            <TerminalButton onClick={handlePay} loading={loading} className="w-full" size="lg">
-              <Zap className="w-4 h-4" /> EXECUTE PAYMENT
-            </TerminalButton>
+            <>
+              {/* Fee Estimate */}
+              <div className="glass-card-subtle p-3 flex items-start gap-2">
+                <Info className="w-3.5 h-3.5 text-white/30 shrink-0 mt-0.5" />
+                <div className="text-[10px] text-white/40 space-y-0.5">
+                  <p>Estimated gas fee: <span className="text-white/60 font-mono">{(DEFAULT_FEE / 1_000_000).toFixed(6)} credits</span></p>
+                  <p>Total cost: <span className="text-white/60 font-mono">{((parseInt(amount) + DEFAULT_FEE) / 1_000_000).toFixed(6)} credits</span> (amount + fee)</p>
+                </div>
+              </div>
+              <TerminalButton onClick={handlePay} loading={loading} className="w-full" size="lg">
+                <Zap className="w-4 h-4" /> EXECUTE PAYMENT
+              </TerminalButton>
+            </>
           )}
 
           {error && (
-            <p className="text-red-400 text-xs flex items-center gap-2">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {error}
-            </p>
+            <div className="space-y-2">
+              <p className="text-red-400 text-xs flex items-center gap-2">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {error}
+              </p>
+              {(error.includes('credit') || error.includes('balance') || error.includes('insufficient')) && (
+                <a
+                  href="https://faucet.aleo.org/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-[10px] text-cyan-400 hover:text-emerald-400 transition-colors"
+                >
+                  Need testnet credits? Get them from the Aleo Faucet →
+                </a>
+              )}
+            </div>
           )}
         </div>
 

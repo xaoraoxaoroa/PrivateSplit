@@ -5,7 +5,11 @@ export default function handler(req, res) {
   res.json({
     status: 'ok',
     service: 'privatesplit-api',
-    mode: 'serverless',
+    version: '2.0.0',
+    network: 'aleo-testnet',
+    program: 'private_split_v2.aleo',
     storage: useSupabase ? 'supabase' : 'in-memory',
+    wave: 2,
+    timestamp: new Date().toISOString(),
   });
 }

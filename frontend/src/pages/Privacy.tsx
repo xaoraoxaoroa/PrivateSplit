@@ -248,6 +248,56 @@ export function Privacy() {
         </div>
       </TerminalCard>
 
+      {/* Cryptographic Details */}
+      <TerminalCard title="CRYPTOGRAPHIC PRIMITIVES">
+        <div className="space-y-5 text-xs">
+          <div>
+            <p className="tracking-wider uppercase mb-1.5 font-medium text-emerald-400">BHP256 Hashing</p>
+            <p className="text-white/40 leading-relaxed mb-2">
+              Split IDs are generated using <span className="text-white/70 font-mono">BHP256::hash_to_field</span> — a ZK-optimized hash function native to Aleo.
+              Given the creator address and a cryptographically random salt, it produces a unique field element. This is collision-resistant:
+              finding two different inputs that produce the same hash requires ~2<sup>128</sup> operations.
+            </p>
+            <div className="bg-black/30 border border-white/[0.06] rounded-xl p-3 font-mono text-[11px] text-white/60">
+              split_id = BHP256::hash_to_field(creator_address, random_salt)
+            </div>
+          </div>
+          <div>
+            <p className="tracking-wider uppercase mb-1.5 font-medium text-cyan-400">Nullifiers (Automatic)</p>
+            <p className="text-white/40 leading-relaxed">
+              Every Aleo record has an automatic nullifier — a unique hash that is revealed when the record is spent.
+              This prevents double-spending without revealing the record's contents. When you pay a debt, the Debt record's
+              nullifier is published, proving it was consumed. But the nullifier reveals <span className="text-emerald-400">nothing</span> about the
+              amount, payer, or creditor. Aleo handles this at the protocol level — no application logic needed.
+            </p>
+          </div>
+          <div>
+            <p className="tracking-wider uppercase mb-1.5 font-medium text-purple-400">Cryptographic Salt</p>
+            <p className="text-white/40 leading-relaxed">
+              Each split uses a 128-bit random salt generated via <span className="text-white/70 font-mono">crypto.getRandomValues()</span> —
+              the browser's cryptographically secure random number generator. This ensures every split ID is unique and unpredictable.
+              The salt is shared with participants via the payment link, but it reveals no private data (amounts, addresses stay encrypted in records).
+            </p>
+          </div>
+          <div>
+            <p className="tracking-wider uppercase mb-1.5 font-medium text-amber-400">Cost Comparison</p>
+            <div className="space-y-2 mt-2">
+              {[
+                { service: 'Splitwise', cost: 'Free (you pay with your data)', privacy: 'None' },
+                { service: 'Venmo', cost: 'Free (public social feed)', privacy: 'None' },
+                { service: 'PrivateSplit', cost: '~0.1 credits gas per transaction', privacy: 'Full ZK privacy' },
+              ].map((row) => (
+                <div key={row.service} className="flex items-center gap-3 glass-card-subtle p-2.5">
+                  <span className="text-white/70 w-24 shrink-0">{row.service}</span>
+                  <span className="text-white/40 flex-1">{row.cost}</span>
+                  <span className={row.privacy === 'None' ? 'text-red-400/70' : 'text-emerald-400 font-medium'}>{row.privacy}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </TerminalCard>
+
       {/* Program Info */}
       <TerminalCard title="ON-CHAIN PROGRAM">
         <div className="space-y-2 text-xs">
