@@ -166,6 +166,7 @@ export function usePaySplit() {
       }
 
       let payRecord: any = null;
+      let bestCreditRecord: any = null;  // fallback: any unspent credit record
       for (const r of records || []) {
         if (r.spent) continue;
         let val = getMicrocreditsFromRecord(r);
@@ -186,6 +187,8 @@ export function usePaySplit() {
           addLog(`Found credits record: ${val} microcredits`, 'success');
           break;
         }
+        // Track any unspent record as fallback (amount might be unreadable)
+        if (!bestCreditRecord) bestCreditRecord = r;
       }
 
       // One retry after delay
@@ -202,6 +205,7 @@ export function usePaySplit() {
               addLog(`Found credits record on retry: ${val} microcredits`, 'success');
               break;
             }
+            if (!bestCreditRecord) bestCreditRecord = r;
           }
         } catch { /* ignore */ }
       }
@@ -255,22 +259,32 @@ export function usePaySplit() {
 
             if (convertConfirmed) {
               addLog('Public-to-private conversion confirmed!', 'success');
-              // Wait a moment for record to appear in wallet
-              await new Promise((r) => setTimeout(r, 3000));
+              // Wait for record to appear in wallet (longer wait for sync)
+              await new Promise((r) => setTimeout(r, 5000));
 
-              // Re-fetch private credit records
-              try {
-                records = (await requestRecords('credits.aleo')) as any[];
-                for (const r of records || []) {
-                  if (r.spent) continue;
-                  const val = getMicrocreditsFromRecord(r);
-                  if (val > amountNeeded) {
-                    payRecord = r;
-                    addLog(`Found converted credits record: ${val} microcredits`, 'success');
-                    break;
+              // Re-fetch private credit records — try multiple times
+              for (let fetchAttempt = 0; fetchAttempt < 3 && !payRecord; fetchAttempt++) {
+                if (fetchAttempt > 0) await new Promise((r) => setTimeout(r, 3000));
+                try {
+                  records = (await requestRecords('credits.aleo')) as any[];
+                  addLog(`Post-conversion: found ${records?.length || 0} credit records`, 'info');
+                  for (const r of records || []) {
+                    if (r.spent) continue;
+                    const val = getMicrocreditsFromRecord(r);
+                    if (val > amountNeeded) {
+                      payRecord = r;
+                      addLog(`Found converted credits record: ${val} microcredits`, 'success');
+                      break;
+                    }
+                    // We just converted enough, so any unspent record should work
+                    if (!payRecord) {
+                      payRecord = r;
+                      addLog(`Using converted credits record (amount unreadable, conversion was ${convertAmount} microcredits)`, 'info');
+                      break;
+                    }
                   }
-                }
-              } catch { /* ignore */ }
+                } catch { /* ignore */ }
+              }
             } else {
               addLog('Conversion timed out — try again in a moment', 'warning');
             }
@@ -280,9 +294,15 @@ export function usePaySplit() {
         }
       }
 
+      // Last fallback: use any unspent credit record we found
+      if (!payRecord && bestCreditRecord) {
+        payRecord = bestCreditRecord;
+        addLog('Using best available credits record (amount unreadable)', 'warning');
+      }
+
       if (!payRecord) {
         setError(
-          `No private credit record with > ${amountNeeded} microcredits. ` +
+          `No private credit record found. ` +
           `You need ${(amountNeeded / 1_000_000).toFixed(6)} credits. ` +
           `Ensure you have sufficient public balance and try again.`
         );
