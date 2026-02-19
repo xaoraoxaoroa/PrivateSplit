@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useWallet } from '@provablehq/aleo-wallet-adaptor-react';
 import { TransactionOptions } from '@provablehq/aleo-types';
-import { PROGRAM_ID, CREDITS_PROGRAM, DEFAULT_FEE } from '../utils/constants';
+import { PROGRAM_ID, PROGRAM_ID_V1, CREDITS_PROGRAM, DEFAULT_FEE } from '../utils/constants';
 import { getSplitStatus, getSplitIdFromMapping, pollTransaction } from '../utils/aleo-utils';
 import { useUIStore } from '../store/splitStore';
 import { api } from '../services/api';
@@ -71,6 +71,13 @@ export function usePaySplit() {
 
       let debtRecordInput: string | null = null;
       let debtAmount = 0;
+      let resolvedProgram = PROGRAM_ID;
+
+      // Try both v2 and v1 programs (debt may have been issued on either)
+      const programsToCheck = [PROGRAM_ID, PROGRAM_ID_V1];
+
+      for (const progId of programsToCheck) {
+        if (debtRecordInput) break;
 
       // Retry up to 3 times for wallet sync
       for (let attempt = 0; attempt < 3 && !debtRecordInput; attempt++) {
@@ -80,8 +87,8 @@ export function usePaySplit() {
           await new Promise((r) => setTimeout(r, delay));
         }
         try {
-          const programRecords = (await requestRecords(PROGRAM_ID)) as any[];
-          addLog(`Found ${programRecords?.length || 0} program records`, 'info');
+          const programRecords = (await requestRecords(progId)) as any[];
+          addLog(`Found ${programRecords?.length || 0} records from ${progId}`, 'info');
 
           for (const r of programRecords || []) {
             if (r.spent) continue;
@@ -98,12 +105,13 @@ export function usePaySplit() {
 
             if (matches && isDebt) {
               debtRecordInput = r.plaintext || r.ciphertext;
+              resolvedProgram = progId;
               // Extract amount precisely using field parser
               const rawAmount = extractField(plaintext, 'amount') || extractField(plaintext, 'per_person');
               if (rawAmount) {
                 debtAmount = parseInt(rawAmount.replace(/u64|u128/g, ''));
               }
-              addLog(`Found Debt record (amount: ${debtAmount} microcredits)`, 'success');
+              addLog(`Found Debt record from ${progId} (amount: ${debtAmount} microcredits)`, 'success');
               break;
             }
           }
@@ -111,6 +119,7 @@ export function usePaySplit() {
           addLog(`Record fetch: ${err.message}`, 'warning');
         }
       }
+      } // end programsToCheck loop
 
       if (!debtRecordInput) {
         setError('No Debt record found in your wallet. The split creator must issue a debt to you first. If they just issued it, wait a moment and try again.');
@@ -269,14 +278,14 @@ export function usePaySplit() {
 
       // Step 5: Execute pay_debt(debt_record, credits_record)
       setStep('pay');
-      addLog('Executing pay_debt transaction...', 'system');
+      addLog(`Executing pay_debt on ${resolvedProgram}...`, 'system');
 
       const inputs = [debtRecordInput, creditsInput];
       addLog(`Debt: ${debtRecordInput.slice(0, 40)}...`, 'info');
       addLog(`Credits: ${creditsInput.slice(0, 40)}...`, 'info');
 
       const transaction: TransactionOptions = {
-        program: PROGRAM_ID,
+        program: resolvedProgram,
         function: 'pay_debt',
         inputs: inputs,
         fee: DEFAULT_FEE,
