@@ -294,9 +294,9 @@ export function Dashboard() {
                   VERIFIED ON ALEO TESTNET
                 </span>
               </div>
-              <span className="text-xs font-mono text-white/50">private_split_v2.aleo</span>
+              <span className="text-xs font-mono text-white/50">private_split_v3.aleo</span>
               <a
-                href="https://testnet.explorer.provable.com/transaction/at1cvwkh4slx2rcx306kuvdw40nz7czkng3kp8yhx3nt2ghdnwxa5zs5n9u5l"
+                href="https://testnet.explorer.provable.com/transaction/at13tejm5w2x5mruh2w47yqy0zfye5ndvvgflmvhe34pa5l5t0y4uxqwp0g4t"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-[10px] text-emerald-400/60 hover:text-emerald-400 transition-colors"
